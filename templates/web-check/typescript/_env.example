@@ -1,0 +1,10 @@
+LEXMOUNT_API_KEY=your_api_key_here
+LEXMOUNT_PROJECT_ID=your_project_id_here
+LEXMOUNT_BASE_URL=https://api.lexmount.cn
+LEXMOUNT_HOME_URL=https://browser.lexmount.cn
+LEXMOUNT_REGION=nanjing-1
+
+# Optional defaults. CLI flags take precedence.
+TARGET_URL=https://example.com
+EXPECTED_TEXT=Example Domain
+ARTIFACTS_DIR=artifacts

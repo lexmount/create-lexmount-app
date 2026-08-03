@@ -1,0 +1,43 @@
+{
+  "name": "create-lexmount-app",
+  "version": "0.1.0",
+  "description": "Scaffold runnable Lexmount browser automation templates",
+  "type": "module",
+  "bin": {
+    "create-lexmount-app": "bin/create-lexmount-app.js"
+  },
+  "files": [
+    "bin",
+    "templates",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check bin/create-lexmount-app.js && npm test",
+    "prepack": "npm run check",
+    "release:npm": "python3 ./scripts/publish-npm.py",
+    "release:npm:check": "python3 ./scripts/publish-npm.py --skip-publish"
+  },
+  "keywords": [
+    "lexmount",
+    "browser-automation",
+    "playwright",
+    "scaffold"
+  ],
+  "author": {
+    "name": "Lexmount Team"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lexmount/create-lexmount-app"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/",
+    "provenance": false
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
