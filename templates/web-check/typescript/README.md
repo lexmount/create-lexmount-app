@@ -13,10 +13,14 @@ Set the required credentials in `.env`:
 ```bash
 LEXMOUNT_API_KEY=your_api_key_here
 LEXMOUNT_PROJECT_ID=your_project_id_here
+LEXMOUNT_REGION=nanjing-1
 ```
 
 `LEXMOUNT_BASE_URL` defaults to `https://api.lexmount.cn` and
 `LEXMOUNT_HOME_URL` defaults to `https://browser.lexmount.cn`.
+`LEXMOUNT_REGION` selects the browser region and currently defaults to
+`nanjing-1` so the generated command has a stable, reachable CDP endpoint.
+Change it when another catalog region is known to be reachable.
 
 ## Run a check
 

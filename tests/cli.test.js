@@ -50,8 +50,16 @@ test('generates the exact web-check TypeScript command into the default director
       /recording: \{ persistent: true \}/
     );
     assert.match(
+      readFileSync(path.join(destination, 'src', 'index.ts'), 'utf8'),
+      /new Lexmount\(\{ region \}\)/
+    );
+    assert.match(
       readFileSync(path.join(destination, '.env.example'), 'utf8'),
       /LEXMOUNT_PROJECT_ID=/
+    );
+    assert.match(
+      readFileSync(path.join(destination, '.env.example'), 'utf8'),
+      /^LEXMOUNT_REGION=nanjing-1$/m
     );
     assert.match(
       readFileSync(path.join(destination, '.gitignore'), 'utf8'),

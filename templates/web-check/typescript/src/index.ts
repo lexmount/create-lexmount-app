@@ -64,7 +64,8 @@ async function runWebCheck(): Promise<WebCheckResult> {
   const screenshotPath = path.join(artifactsDirectory, 'screenshot.png');
   await mkdir(artifactsDirectory, { recursive: true });
 
-  const client = new Lexmount();
+  const region = process.env.LEXMOUNT_REGION?.trim() || 'nanjing-1';
+  const client = new Lexmount({ region });
   const session = await client.sessions.create({
     browserMode: 'normal',
     recording: { persistent: true },

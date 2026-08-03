@@ -25,6 +25,7 @@ After creation:
 cd lexmount-web-check
 cp .env.example .env
 # Fill in LEXMOUNT_API_KEY and LEXMOUNT_PROJECT_ID.
+# LEXMOUNT_REGION defaults to nanjing-1 and can be changed in .env.
 npm run check -- --url https://example.com --expected "Example Domain"
 ```
 
@@ -57,3 +58,16 @@ into a non-empty directory and never overwrites an existing project.
 npm test
 npm pack --dry-run
 ```
+
+## Publishing
+
+Publishing follows the Lexmount Node.js SDK release workflow. A published
+GitHub Release triggers `.github/workflows/publish.yml`, which checks that the
+version is new, installs from the lockfile, runs the test/package validation,
+and publishes to npm.
+
+The npm package must trust the GitHub Actions publisher for repository
+`lexmount/create-lexmount-app` and workflow `publish.yml`. The workflow uses
+GitHub OIDC (`id-token: write`), so it does not store a long-lived npm token.
+Before creating a release, bump `package.json` and `package-lock.json` to the
+same unpublished version and make the release tag match that version.

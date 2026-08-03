@@ -14,7 +14,9 @@
   "scripts": {
     "test": "node --test",
     "check": "node --check bin/create-lexmount-app.js && npm test",
-    "prepack": "npm run check"
+    "prepack": "npm run check",
+    "release:npm": "python3 ./scripts/publish-npm.py",
+    "release:npm:check": "python3 ./scripts/publish-npm.py --skip-publish"
   },
   "keywords": [
     "lexmount",
