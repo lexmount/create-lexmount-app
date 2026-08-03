@@ -56,6 +56,7 @@ into a non-empty directory and never overwrites an existing project.
 
 ```bash
 npm test
+npm run test:release
 npm pack --dry-run
 ```
 

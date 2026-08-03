@@ -6,10 +6,18 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 from shutil import which
+
+
+SEMVER_PATTERN = re.compile(
+    r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
+    r"(?:-(?P<prerelease>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
+    r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
+)
 
 
 def resolve_command(command: str) -> str:
@@ -32,16 +40,19 @@ def load_package_metadata(root: Path) -> tuple[str, str]:
     return data["name"], data["version"]
 
 
-def assert_github_release_matches_version(version: str) -> None:
-    if os.environ.get("GITHUB_ACTIONS", "").lower() != "true":
-        return
+def assert_release_is_publishable(
+    version: str, release_tag: str, is_github_prerelease: bool
+) -> None:
+    version_match = SEMVER_PATTERN.fullmatch(version)
+    if version_match is None:
+        raise RuntimeError(f"Package version {version!r} is not valid SemVer.")
 
-    release_tag = os.environ.get("GITHUB_RELEASE_TAG", "").strip()
-    is_prerelease = (
-        os.environ.get("GITHUB_RELEASE_PRERELEASE", "").strip().lower() == "true"
-    )
+    if version_match.group("prerelease") is not None:
+        raise RuntimeError(
+            f"Prerelease package version {version!r} is not published by this workflow."
+        )
 
-    if is_prerelease:
+    if is_github_prerelease:
         raise RuntimeError(
             "Prerelease GitHub Releases are not published by this workflow."
         )
@@ -53,6 +64,17 @@ def assert_github_release_matches_version(version: str) -> None:
             f"GitHub Release tag {release_tag!r} does not match package version "
             f"{version!r}; expected {expected}."
         )
+
+
+def assert_github_release_matches_version(version: str) -> None:
+    if os.environ.get("GITHUB_ACTIONS", "").lower() != "true":
+        return
+
+    release_tag = os.environ.get("GITHUB_RELEASE_TAG", "").strip()
+    is_github_prerelease = (
+        os.environ.get("GITHUB_RELEASE_PRERELEASE", "").strip().lower() == "true"
+    )
+    assert_release_is_publishable(version, release_tag, is_github_prerelease)
 
 
 def assert_version_not_published(
@@ -124,6 +146,21 @@ def main() -> int:
         print("==> Skipping npm version availability check")
 
     run_step("Installing dependencies", [npm, "ci"], root)
+    run_step(
+        "Testing release guards",
+        [
+            sys.executable,
+            "-B",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests",
+            "-p",
+            "test_publish_npm.py",
+        ],
+        root,
+    )
     run_step("Running checks", [npm, "run", "check"], root)
     run_step("Validating package contents", [npm, "pack", "--dry-run"], root)
 
