@@ -11,6 +11,9 @@ const repositoryRoot = path.resolve(
   '..'
 );
 const cliPath = path.join(repositoryRoot, 'bin', 'create-lexmount-app.js');
+const packageVersion = JSON.parse(
+  readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8')
+).version;
 
 function withTemporaryDirectory(run) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'create-lexmount-app-'));
@@ -127,5 +130,5 @@ test('prints help and version without requiring template flags', () => {
 
   const version = runCli(repositoryRoot, ['--version']);
   assert.equal(version.status, 0, version.stderr);
-  assert.equal(version.stdout.trim(), '0.1.0');
+  assert.equal(version.stdout.trim(), packageVersion);
 });

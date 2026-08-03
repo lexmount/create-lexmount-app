@@ -56,6 +56,7 @@ into a non-empty directory and never overwrites an existing project.
 
 ```bash
 npm test
+npm run test:release
 npm pack --dry-run
 ```
 
@@ -66,8 +67,30 @@ GitHub Release triggers `.github/workflows/publish.yml`, which checks that the
 version is new, installs from the lockfile, runs the test/package validation,
 and publishes to npm.
 
-The npm package must trust the GitHub Actions publisher for repository
-`lexmount/create-lexmount-app` and workflow `publish.yml`. The workflow uses
-GitHub OIDC (`id-token: write`), so it does not store a long-lived npm token.
-Before creating a release, bump `package.json` and `package-lock.json` to the
-same unpublished version and make the release tag match that version.
+Because `create-lexmount-app` is a new package, the first version must be
+published once by an authorized npm account. After that bootstrap publish,
+configure npm trusted publishing for GitHub repository
+`lexmount/create-lexmount-app`, workflow `publish.yml`, and the `npm publish`
+action. Future releases use GitHub OIDC (`id-token: write`) and do not store a
+long-lived npm token.
+
+One-time bootstrap after this repository is merged:
+
+```bash
+npm login
+npm publish --access public
+npm trust github create-lexmount-app \
+  --repo lexmount/create-lexmount-app \
+  --file publish.yml \
+  --allow-publish
+```
+
+The authenticated maintainer must complete npm's required 2FA. The first
+automated release must use the next unpublished version because the bootstrap
+command publishes the current one.
+
+Before creating an automated release, bump `package.json` and
+`package-lock.json` to the same unpublished stable version. The workflow
+rejects prereleases and requires the GitHub Release tag to be exactly
+`v<version>` or `<version>`. Trusted publishing generates npm provenance
+automatically.
