@@ -35,4 +35,6 @@ jobs:
       - name: Validate and publish package
         env:
           GITHUB_ACTIONS: "true"
+          GITHUB_RELEASE_TAG: ${{ github.event.release.tag_name }}
+          GITHUB_RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
         run: python3 ./scripts/publish-npm.py --skip-login-check

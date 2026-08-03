@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -29,6 +30,29 @@ def load_package_metadata(root: Path) -> tuple[str, str]:
     package_json = root / "package.json"
     data = json.loads(package_json.read_text(encoding="utf-8"))
     return data["name"], data["version"]
+
+
+def assert_github_release_matches_version(version: str) -> None:
+    if os.environ.get("GITHUB_ACTIONS", "").lower() != "true":
+        return
+
+    release_tag = os.environ.get("GITHUB_RELEASE_TAG", "").strip()
+    is_prerelease = (
+        os.environ.get("GITHUB_RELEASE_PRERELEASE", "").strip().lower() == "true"
+    )
+
+    if is_prerelease:
+        raise RuntimeError(
+            "Prerelease GitHub Releases are not published by this workflow."
+        )
+
+    expected_tags = {version, f"v{version}"}
+    if release_tag not in expected_tags:
+        expected = " or ".join(sorted(expected_tags))
+        raise RuntimeError(
+            f"GitHub Release tag {release_tag!r} does not match package version "
+            f"{version!r}; expected {expected}."
+        )
 
 
 def assert_version_not_published(
@@ -85,6 +109,7 @@ def main() -> int:
     root = Path(__file__).resolve().parent.parent
     npm = resolve_command("npm")
     package_name, version = load_package_metadata(root)
+    assert_github_release_matches_version(version)
 
     if not args.skip_login_check:
         run_step("Checking npm login", [npm, "whoami"], root)
