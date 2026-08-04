@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -11,12 +14,12 @@ import {
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
   authorizeWithBrowser,
   discoverCredentials,
+  openExternalUrl,
   parseEnvFile,
   resolveConnectBaseUrl,
 } from '../bin/auth.js';
@@ -91,7 +94,7 @@ test('generates the screenshot TypeScript template and a protected local env', (
     );
     assert.match(
       readFileSync(path.join(destination, 'src', 'index.ts'), 'utf8'),
-      /new Lexmount\(\{ region \}\)/
+      /new Lexmount\(region \? \{ region \} : \{\}\)/
     );
     assert.match(
       readFileSync(path.join(destination, 'src', 'index.ts'), 'utf8'),
@@ -109,9 +112,13 @@ test('generates the screenshot TypeScript template and a protected local env', (
       readFileSync(path.join(destination, '.env.example'), 'utf8'),
       /LEXMOUNT_PROJECT_ID=/
     );
+    assert.doesNotMatch(
+      readFileSync(path.join(destination, '.env.example'), 'utf8'),
+      /^LEXMOUNT_REGION=/m
+    );
     assert.match(
       readFileSync(path.join(destination, '.env.example'), 'utf8'),
-      /^LEXMOUNT_REGION=nanjing-1$/m
+      /^# LEXMOUNT_REGION=your_catalog_region_id$/m
     );
     assert.match(
       readFileSync(path.join(destination, '.gitignore'), 'utf8'),
@@ -215,6 +222,41 @@ test('--no-auth supports offline generation without creating .env', () => {
   });
 });
 
+test('installs and immediately runs the generated screenshot example', () => {
+  withTemporaryDirectory((cwd) => {
+    const binDirectory = path.join(cwd, 'bin');
+    const logPath = path.join(cwd, 'package-manager.log');
+    mkdirSync(binDirectory);
+    const npmPath = path.join(binDirectory, 'npm');
+    writeFileSync(
+      npmPath,
+      '#!/bin/sh\nprintf "%s\\n" "$*" >> "$FAKE_NPM_LOG"\n'
+    );
+    chmodSync(npmPath, 0o755);
+
+    const result = runCli(
+      cwd,
+      ['--template', 'screenshot', '--language', 'typescript'],
+      testCredentials(cwd, {
+        FAKE_NPM_LOG: logPath,
+        PATH: `${binDirectory}${path.delimiter}${process.env.PATH ?? ''}`,
+        npm_config_user_agent: 'npm/10.0.0 node/v22.0.0',
+      })
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(
+      readFileSync(logPath, 'utf8').trim().split('\n'),
+      [
+        'install',
+        'run screenshot -- --url https://example.com',
+      ]
+    );
+    assert.match(result.stdout, /Running screenshot example for https:\/\/example\.com/);
+    assert.doesNotMatch(result.stdout, /Next steps:/);
+  });
+});
+
 test('prints help and version without requiring template flags', () => {
   const help = runCli(repositoryRoot, ['--help']);
   assert.equal(help.status, 0, help.stderr);
@@ -280,6 +322,31 @@ test('maps office and qcloud-hk API hosts to their authorization consoles', () =
     resolveConnectBaseUrl('https://api.lexmount.cn'),
     'https://browser.lexmount.cn'
   );
+});
+
+test('browser opener returns after spawn without waiting for the opener to exit', async () => {
+  const child = new EventEmitter();
+  let unrefCalled = false;
+  child.unref = () => {
+    unrefCalled = true;
+  };
+
+  const opened = openExternalUrl('https://browser.lexmount.cn/connect/codex', {
+    platform: 'linux',
+    spawnImpl: (command, args, options) => {
+      assert.equal(command, 'xdg-open');
+      assert.deepEqual(args, [
+        'https://browser.lexmount.cn/connect/codex',
+      ]);
+      assert.equal(options.detached, true);
+      assert.equal(options.stdio, 'ignore');
+      queueMicrotask(() => child.emit('spawn'));
+      return child;
+    },
+  });
+
+  assert.equal(await opened, true);
+  assert.equal(unrefCalled, true);
 });
 
 test('completes loopback PKCE authorization and exchanges credentials', async () => {
