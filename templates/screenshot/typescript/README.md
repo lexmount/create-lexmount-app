@@ -15,13 +15,13 @@ If you generated with `--no-auth`, create `.env` manually:
 ```bash
 LEXMOUNT_API_KEY=your_api_key_here
 LEXMOUNT_PROJECT_ID=your_project_id_here
-LEXMOUNT_REGION=nanjing-1
+# Optional: LEXMOUNT_REGION=your_catalog_region_id
 ```
 
 `LEXMOUNT_BASE_URL` defaults to `https://api.lexmount.cn`.
-`LEXMOUNT_REGION` selects the browser region and currently defaults to
-`nanjing-1` so the generated command has a stable, reachable CDP endpoint.
-Change it when another catalog region is known to be reachable.
+Leave `LEXMOUNT_REGION` unset to let the SDK and API select an available
+region automatically. Set it only when you need a specific region ID from the
+API catalog.
 
 ## Capture a screenshot
 

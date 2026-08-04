@@ -267,13 +267,16 @@ function createCallbackServer(expectedState) {
   return { server, callback };
 }
 
-export function openExternalUrl(url) {
+export function openExternalUrl(
+  url,
+  { platform = process.platform, spawnImpl = spawn } = {}
+) {
   let command;
   let args;
-  if (process.platform === 'darwin') {
+  if (platform === 'darwin') {
     command = 'open';
     args = [url];
-  } else if (process.platform === 'win32') {
+  } else if (platform === 'win32') {
     command = 'rundll32';
     args = ['url.dll,FileProtocolHandler', url];
   } else {
@@ -282,12 +285,23 @@ export function openExternalUrl(url) {
   }
 
   return new Promise((resolve) => {
-    const child = spawn(command, args, {
+    let settled = false;
+    const child = spawnImpl(command, args, {
+      detached: true,
       stdio: 'ignore',
       windowsHide: true,
     });
-    child.once('error', () => resolve(false));
-    child.once('close', (code) => resolve(code === 0));
+    child.once('spawn', () => {
+      if (settled) return;
+      settled = true;
+      child.unref();
+      resolve(true);
+    });
+    child.once('error', () => {
+      if (settled) return;
+      settled = true;
+      resolve(false);
+    });
   });
 }
 

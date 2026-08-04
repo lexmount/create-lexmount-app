@@ -26,6 +26,7 @@ const packageMetadata = JSON.parse(
 const supportedTemplates = new Map([
   ['screenshot', new Set(['typescript'])],
 ]);
+const DEFAULT_SCREENSHOT_URL = 'https://example.com';
 
 const helpText = `create-lexmount-app
 
@@ -35,7 +36,7 @@ Usage:
 Options:
   --template <name>       Template to generate (supported: screenshot)
   --language <language>   Template language (supported: typescript)
-  --no-install            Generate files without installing dependencies
+  --no-install            Generate files without installing dependencies or running the example
   --no-auth               Skip local credential discovery and browser authorization
   --connect-base-url      Override the Lexmount console used for authorization
   --help, -h              Show this help
@@ -239,12 +240,39 @@ function installDependencies(destination) {
   return packageManager;
 }
 
-function printNextSteps(destination, packageManager, installed, credentialsConfigured) {
+function runScreenshotExample(destination, packageManager) {
+  console.log(`\nRunning screenshot example for ${DEFAULT_SCREENSHOT_URL}...`);
+  const result = spawnSync(
+    packageManager,
+    ['run', 'screenshot', '--', '--url', DEFAULT_SCREENSHOT_URL],
+    {
+      cwd: destination,
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    }
+  );
+  if (result.error) {
+    throw new Error(
+      `Failed to start the screenshot example with ${packageManager}: ${result.error.message}`
+    );
+  }
+  if (result.status !== 0) {
+    throw new Error(
+      `Screenshot example failed with exit code ${result.status}`
+    );
+  }
+}
+
+function printManualRunInstructions(
+  destination,
+  packageManager,
+  installed,
+  credentialsConfigured
+) {
   const relativeDestination = path.relative(process.cwd(), destination) || '.';
   const runPrefix = packageManager === 'npm' ? 'npm run' : packageManager;
 
-  console.log(`\nCreated Lexmount app in ${destination}`);
-  console.log('\nNext steps:');
+  console.log('\nThe screenshot example was not run automatically:');
   if (relativeDestination !== '.') {
     console.log(`  cd ${relativeDestination}`);
   }
@@ -255,9 +283,7 @@ function printNextSteps(destination, packageManager, installed, credentialsConfi
   if (!installed) {
     console.log(`  ${packageManager} install`);
   }
-  console.log(
-    `  ${runPrefix} screenshot -- --url https://example.com`
-  );
+  console.log(`  ${runPrefix} screenshot -- --url ${DEFAULT_SCREENSHOT_URL}`);
 }
 
 async function main(argv) {
@@ -330,12 +356,17 @@ async function main(argv) {
   if (options.install) {
     installDependencies(destination);
   }
-  printNextSteps(
-    destination,
-    packageManager,
-    options.install,
-    Boolean(credentials)
-  );
+  console.log(`\nCreated Lexmount app in ${destination}`);
+  if (options.install && credentials) {
+    runScreenshotExample(destination, packageManager);
+  } else {
+    printManualRunInstructions(
+      destination,
+      packageManager,
+      options.install,
+      Boolean(credentials)
+    );
+  }
 }
 
 try {

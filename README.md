@@ -10,8 +10,9 @@ npx create-lexmount-app --template screenshot --language typescript
 ```
 
 The command creates `lexmount-screenshot/`, configures local Lexmount
-credentials, installs dependencies, and prints the next steps. Credential
-setup uses this order:
+credentials, installs dependencies, and immediately runs the generated
+screenshot example against `https://example.com`. Credential setup uses this
+order:
 
 1. current `LEXMOUNT_API_KEY` + `LEXMOUNT_PROJECT_ID` environment variables;
 2. `.env.local` or `.env` in the current directory;
@@ -28,13 +29,17 @@ npx create-lexmount-app my-screenshot \
   --language typescript
 ```
 
-After creation:
+To run it again with another URL:
 
 ```bash
 cd lexmount-screenshot
-# LEXMOUNT_REGION defaults to nanjing-1 and can be changed in .env.
 npm run screenshot -- --url https://example.com
 ```
+
+Leave `LEXMOUNT_REGION` unset to let the SDK and API automatically select an
+available region. Set it in `.env` only when targeting a specific region ID
+from the API catalog. `--no-install` and `--no-auth` skip automatic execution
+and print the manual command instead.
 
 The generated app uses the official Lexmount SDK to create a temporary browser
 session, navigates with Playwright, writes `artifacts/screenshot.png`, and
@@ -51,7 +56,7 @@ prints the title, final URL, and screenshot path as structured JSON.
 ```text
 create-lexmount-app [directory] --template <name> --language <language>
 
---no-install   Generate files without installing dependencies
+--no-install   Generate files without installing dependencies or running the example
 --no-auth      Skip credential discovery and browser authorization
 --connect-base-url <url>
                Override the Lexmount console used for authorization

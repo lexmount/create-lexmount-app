@@ -50,8 +50,8 @@ async function captureScreenshot(): Promise<ScreenshotResult> {
   const screenshotPath = path.join(artifactsDirectory, 'screenshot.png');
   await mkdir(artifactsDirectory, { recursive: true });
 
-  const region = process.env.LEXMOUNT_REGION?.trim() || 'nanjing-1';
-  const client = new Lexmount({ region });
+  const region = process.env.LEXMOUNT_REGION?.trim();
+  const client = new Lexmount(region ? { region } : {});
   const session = await client.sessions.create({
     browserMode: 'normal',
   });
