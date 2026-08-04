@@ -6,38 +6,45 @@ catalog.
 ## Quick start
 
 ```bash
-npx create-lexmount-app --template web-check --language typescript
+npx create-lexmount-app --template screenshot --language typescript
 ```
 
-The command creates `lexmount-web-check/`, installs its dependencies, and
-prints the next steps. To choose another destination directory, pass it as the
-first positional argument:
+The command creates `lexmount-screenshot/`, configures local Lexmount
+credentials, installs dependencies, and prints the next steps. Credential
+setup uses this order:
+
+1. current `LEXMOUNT_API_KEY` + `LEXMOUNT_PROJECT_ID` environment variables;
+2. `.env.local` or `.env` in the current directory;
+3. the local browser-cli credentials file;
+4. a browser-based loopback + PKCE authorization flow.
+
+The generated `.env` is ignored by Git, written with mode `0600` on POSIX, and
+the API key is never printed. To choose another destination directory, pass it
+as the first positional argument:
 
 ```bash
-npx create-lexmount-app my-web-check \
-  --template web-check \
+npx create-lexmount-app my-screenshot \
+  --template screenshot \
   --language typescript
 ```
 
 After creation:
 
 ```bash
-cd lexmount-web-check
-cp .env.example .env
-# Fill in LEXMOUNT_API_KEY and LEXMOUNT_PROJECT_ID.
+cd lexmount-screenshot
 # LEXMOUNT_REGION defaults to nanjing-1 and can be changed in .env.
-npm run check -- --url https://example.com --expected "Example Domain"
+npm run screenshot -- --url https://example.com
 ```
 
-The generated app starts a persistent-recording Lexmount session, checks the
-page text, writes `artifacts/screenshot.png`, prints structured JSON, and links
-to the session detail page where Replay becomes available after processing.
+The generated app uses the official Lexmount SDK to create a temporary browser
+session, navigates with Playwright, writes `artifacts/screenshot.png`, and
+prints the title, final URL, and screenshot path as structured JSON.
 
 ## Supported templates
 
 | Template | Language | Description |
 | --- | --- | --- |
-| `web-check` | `typescript` | Check a URL for expected text and preserve screenshot/Replay evidence. |
+| `screenshot` | `typescript` | Navigate to a URL and capture a full-page screenshot. |
 
 ## CLI options
 
@@ -45,12 +52,26 @@ to the session detail page where Replay becomes available after processing.
 create-lexmount-app [directory] --template <name> --language <language>
 
 --no-install   Generate files without installing dependencies
+--no-auth      Skip credential discovery and browser authorization
+--connect-base-url <url>
+               Override the Lexmount console used for authorization
 --help, -h     Show help
 --version, -v  Show the package version
 ```
 
 The destination defaults to `lexmount-<template>`. The CLI refuses to write
 into a non-empty directory and never overwrites an existing project.
+
+The API environment can be selected before running `npx`:
+
+```bash
+export LEXMOUNT_BASE_URL=https://apitest.local.lexmount.net # office
+export LEXMOUNT_BASE_URL=https://api.lexmount.com           # qcloud-hk
+```
+
+The authorization console is inferred from the API URL. Use
+`--connect-base-url` only for a custom environment. For offline generation or
+CI packaging, pass `--no-auth`, then copy `.env.example` to `.env` yourself.
 
 ## Development
 

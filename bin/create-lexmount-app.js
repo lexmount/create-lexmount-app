@@ -11,6 +11,12 @@ import {
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import {
+  authorizeWithBrowser,
+  discoverCredentials,
+  resolveConnectBaseUrl,
+  writeProjectEnv,
+} from './auth.js';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packageMetadata = JSON.parse(
@@ -18,7 +24,7 @@ const packageMetadata = JSON.parse(
 );
 
 const supportedTemplates = new Map([
-  ['web-check', new Set(['typescript'])],
+  ['screenshot', new Set(['typescript'])],
 ]);
 
 const helpText = `create-lexmount-app
@@ -27,15 +33,17 @@ Usage:
   create-lexmount-app [directory] --template <name> --language <language>
 
 Options:
-  --template <name>       Template to generate (supported: web-check)
+  --template <name>       Template to generate (supported: screenshot)
   --language <language>   Template language (supported: typescript)
   --no-install            Generate files without installing dependencies
+  --no-auth               Skip local credential discovery and browser authorization
+  --connect-base-url      Override the Lexmount console used for authorization
   --help, -h              Show this help
   --version, -v           Show the package version
 
 Examples:
-  npx create-lexmount-app --template web-check --language typescript
-  npx create-lexmount-app my-check --template web-check --language typescript
+  npx create-lexmount-app --template screenshot --language typescript
+  npx create-lexmount-app my-screenshot --template screenshot --language typescript
 `;
 
 function readOptionValue(argv, index, optionName) {
@@ -49,6 +57,8 @@ function readOptionValue(argv, index, optionName) {
 function parseArguments(argv) {
   const options = {
     directory: undefined,
+    auth: true,
+    connectBaseUrl: undefined,
     install: true,
     language: undefined,
     template: undefined,
@@ -70,6 +80,23 @@ function parseArguments(argv) {
     }
     if (argument === '--no-install') {
       options.install = false;
+      continue;
+    }
+    if (argument === '--no-auth') {
+      options.auth = false;
+      continue;
+    }
+    if (argument === '--connect-base-url') {
+      options.connectBaseUrl = readOptionValue(
+        argv,
+        index,
+        '--connect-base-url'
+      );
+      index += 1;
+      continue;
+    }
+    if (argument.startsWith('--connect-base-url=')) {
+      options.connectBaseUrl = argument.slice('--connect-base-url='.length);
       continue;
     }
     if (argument === '--template') {
@@ -212,7 +239,7 @@ function installDependencies(destination) {
   return packageManager;
 }
 
-function printNextSteps(destination, packageManager, installed) {
+function printNextSteps(destination, packageManager, installed, credentialsConfigured) {
   const relativeDestination = path.relative(process.cwd(), destination) || '.';
   const runPrefix = packageManager === 'npm' ? 'npm run' : packageManager;
 
@@ -221,17 +248,19 @@ function printNextSteps(destination, packageManager, installed) {
   if (relativeDestination !== '.') {
     console.log(`  cd ${relativeDestination}`);
   }
-  console.log('  cp .env.example .env');
-  console.log('  # Add LEXMOUNT_API_KEY and LEXMOUNT_PROJECT_ID to .env');
+  if (!credentialsConfigured) {
+    console.log('  cp .env.example .env');
+    console.log('  # Add LEXMOUNT_API_KEY and LEXMOUNT_PROJECT_ID to .env');
+  }
   if (!installed) {
     console.log(`  ${packageManager} install`);
   }
   console.log(
-    `  ${runPrefix} check -- --url https://example.com --expected "Example Domain"`
+    `  ${runPrefix} screenshot -- --url https://example.com`
   );
 }
 
-function main(argv) {
+async function main(argv) {
   const options = parseArguments(argv);
   if (options.help) {
     process.stdout.write(helpText);
@@ -248,6 +277,36 @@ function main(argv) {
   const destination = path.resolve(process.cwd(), directory);
   assertWritableDestination(destination);
 
+  let credentials;
+  if (options.auth) {
+    const discovered = discoverCredentials();
+    credentials = discovered.credentials;
+    if (credentials) {
+      credentials = {
+        ...credentials,
+        apiBaseUrl: discovered.apiBaseUrl,
+      };
+      console.log(`Using Lexmount credentials from ${credentials.source}.`);
+    } else {
+      const connectBaseUrl = resolveConnectBaseUrl(
+        discovered.apiBaseUrl,
+        options.connectBaseUrl
+      );
+      console.log(
+        `No complete local Lexmount credentials found. Opening ${connectBaseUrl} for authorization...`
+      );
+      credentials = await authorizeWithBrowser({
+        apiBaseUrl: discovered.apiBaseUrl,
+        connectBaseUrl,
+        onManualUrl: (url) => {
+          console.log('Open this URL in your browser to continue:');
+          console.log(url);
+        },
+      });
+      console.log('Lexmount authorization completed.');
+    }
+  }
+
   const source = path.join(
     packageRoot,
     'templates',
@@ -262,16 +321,25 @@ function main(argv) {
   renderTemplateDirectory(source, destination, {
     PROJECT_NAME: projectName,
   });
+  if (credentials) {
+    writeProjectEnv(destination, credentials);
+    console.log('Saved Lexmount credentials to the generated .env (API key hidden).');
+  }
 
   const packageManager = detectPackageManager();
   if (options.install) {
     installDependencies(destination);
   }
-  printNextSteps(destination, packageManager, options.install);
+  printNextSteps(
+    destination,
+    packageManager,
+    options.install,
+    Boolean(credentials)
+  );
 }
 
 try {
-  main(process.argv.slice(2));
+  await main(process.argv.slice(2));
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
   console.error(`create-lexmount-app: ${message}`);
