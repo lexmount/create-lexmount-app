@@ -55,6 +55,7 @@ async function captureScreenshot(): Promise<ScreenshotResult> {
   const session = await client.sessions.create({
     browserMode: 'normal',
   });
+  console.log(`Inspect URL: ${session.inspectUrl}`);
   let browser: Browser | undefined;
 
   try {

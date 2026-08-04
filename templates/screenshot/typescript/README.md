@@ -35,10 +35,11 @@ flags.
 The command:
 
 1. uses the official `lexmount` SDK to create a temporary browser session;
-2. connects Playwright to that session and opens the target URL;
-3. writes a full-page screenshot to `artifacts/screenshot.png`;
-4. closes the browser and Lexmount session in a `finally` block;
-5. prints JSON containing `title`, `final_url`, and `screenshot`.
+2. immediately prints the session's inspect URL;
+3. connects Playwright to that session and opens the target URL;
+4. writes a full-page screenshot to `artifacts/screenshot.png`;
+5. closes the browser and Lexmount session in a `finally` block;
+6. prints JSON containing `title`, `final_url`, and `screenshot`.
 
 ## Validate the generated project
 

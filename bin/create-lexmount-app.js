@@ -324,6 +324,7 @@ async function main(argv) {
       credentials = await authorizeWithBrowser({
         apiBaseUrl: discovered.apiBaseUrl,
         connectBaseUrl,
+        onProgress: (message) => console.log(message),
         onManualUrl: (url) => {
           console.log('Open this URL in your browser to continue:');
           console.log(url);
