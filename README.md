@@ -42,8 +42,14 @@ from the API catalog. `--no-install` and `--no-auth` skip automatic execution
 and print the manual command instead.
 
 The generated app uses the official Lexmount SDK to create a temporary browser
-session, navigates with Playwright, writes `artifacts/screenshot.png`, and
-prints the title, final URL, and screenshot path as structured JSON.
+session, prints its inspect URL before connecting or navigating, navigates with
+Playwright, writes `artifacts/screenshot.png`, and prints the title, final URL,
+and screenshot path as structured JSON.
+
+During browser authorization, the CLI prints progress when the loopback
+callback arrives and when credential exchange finishes. The callback response
+closes its localhost connection explicitly, so a browser keep-alive connection
+cannot delay dependency installation.
 
 ## Supported templates
 

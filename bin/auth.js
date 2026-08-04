@@ -15,6 +15,7 @@ export const DEFAULT_API_BASE_URL = 'https://api.lexmount.cn';
 const CONNECT_SCOPE = ['browser:sessions', 'browser:actions'];
 const AUTH_TIMEOUT_MS = 5 * 60 * 1000;
 const EXCHANGE_TIMEOUT_MS = 30 * 1000;
+const CALLBACK_SHUTDOWN_GRACE_MS = 500;
 
 function normalizeHttpUrl(value, label) {
   let parsed;
@@ -210,6 +211,7 @@ function sendCallbackPage(response, status, title, message) {
   response.writeHead(status, {
     'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': 'no-store',
+    Connection: 'close',
   });
   response.end(
     `<!doctype html><meta charset="utf-8"><title>${title}</title>` +
@@ -265,6 +267,31 @@ function createCallbackServer(expectedState) {
   });
 
   return { server, callback };
+}
+
+async function closeCallbackServer(server) {
+  if (!server.listening) {
+    server.closeAllConnections?.();
+    return;
+  }
+
+  await new Promise((resolve) => {
+    let settled = false;
+    let forceTimer;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(forceTimer);
+      resolve();
+    };
+
+    server.close(finish);
+    server.closeIdleConnections?.();
+    forceTimer = setTimeout(() => {
+      server.closeAllConnections?.();
+      finish();
+    }, CALLBACK_SHUTDOWN_GRACE_MS);
+  });
 }
 
 export function openExternalUrl(
@@ -371,6 +398,7 @@ export async function authorizeWithBrowser({
   fetchImpl = fetch,
   timeoutMs = AUTH_TIMEOUT_MS,
   onManualUrl = () => {},
+  onProgress = () => {},
 } = {}) {
   const normalizedApiBaseUrl = normalizeHttpUrl(
     apiBaseUrl || DEFAULT_API_BASE_URL,
@@ -428,6 +456,7 @@ export async function authorizeWithBrowser({
     } finally {
       clearTimeout(callbackTimeout);
     }
+    onProgress('Authorization callback received. Exchanging credentials...');
     const credentials = await exchangeCode({
       connectBaseUrl: normalizedConnectBaseUrl,
       code,
@@ -444,6 +473,7 @@ export async function authorizeWithBrowser({
         'Lexmount authorization returned credentials for a different API environment'
       );
     }
+    onProgress('Lexmount credentials received. Preparing project...');
     return {
       ...credentials,
       apiBaseUrl: exchangedBaseUrl,
@@ -451,7 +481,7 @@ export async function authorizeWithBrowser({
     };
   } finally {
     clearTimeout(timeout);
-    await new Promise((resolve) => server.close(resolve));
+    await closeCallbackServer(server);
   }
 }
 

@@ -88,24 +88,25 @@ test('generates the screenshot TypeScript template and a protected local env', (
     assert.equal(generatedPackage.name, 'lexmount-screenshot');
     assert.equal(generatedPackage.scripts.screenshot, 'tsx src/index.ts');
     assert.equal(generatedPackage.dependencies.lexmount, '^0.5.15');
-    assert.match(
-      readFileSync(path.join(destination, 'src', 'index.ts'), 'utf8'),
-      /client\.sessions\.create/
+    const generatedSource = readFileSync(
+      path.join(destination, 'src', 'index.ts'),
+      'utf8'
     );
+    assert.match(generatedSource, /client\.sessions\.create/);
     assert.match(
-      readFileSync(path.join(destination, 'src', 'index.ts'), 'utf8'),
+      generatedSource,
       /new Lexmount\(region \? \{ region \} : \{\}\)/
     );
-    assert.match(
-      readFileSync(path.join(destination, 'src', 'index.ts'), 'utf8'),
-      /page\.goto\(targetUrl/
+    assert.match(generatedSource, /page\.goto\(targetUrl/);
+    assert.match(generatedSource, /page\.screenshot/);
+    const inspectLogIndex = generatedSource.indexOf(
+      'console.log(`Inspect URL: ${session.inspectUrl}`)'
     );
-    assert.match(
-      readFileSync(path.join(destination, 'src', 'index.ts'), 'utf8'),
-      /page\.screenshot/
-    );
+    assert.ok(inspectLogIndex >= 0);
+    assert.ok(inspectLogIndex < generatedSource.indexOf('chromium.connectOverCDP'));
+    assert.ok(inspectLogIndex < generatedSource.indexOf('page.goto(targetUrl'));
     assert.doesNotMatch(
-      readFileSync(path.join(destination, 'src', 'index.ts'), 'utf8'),
+      generatedSource,
       /EXPECTED_TEXT|matched|recording/
     );
     assert.match(
@@ -351,6 +352,9 @@ test('browser opener returns after spawn without waiting for the opener to exit'
 
 test('completes loopback PKCE authorization and exchanges credentials', async () => {
   let exchangeBody;
+  let callbackConnectionHeader;
+  const callbackAgent = new http.Agent({ keepAlive: true });
+  const progress = [];
   const exchangeServer = http.createServer((request, response) => {
     let body = '';
     request.setEncoding('utf8');
@@ -378,6 +382,7 @@ test('completes loopback PKCE authorization and exchanges credentials', async ()
   const exchangeBaseUrl = `http://127.0.0.1:${address.port}`;
 
   try {
+    const authorizationStartedAt = Date.now();
     const credentials = await authorizeWithBrowser({
       apiBaseUrl: exchangeBaseUrl,
       connectBaseUrl: exchangeBaseUrl,
@@ -387,10 +392,23 @@ test('completes loopback PKCE authorization and exchanges credentials', async ()
         const callbackUrl = new URL(connectUrl.searchParams.get('redirect_uri'));
         callbackUrl.searchParams.set('code', 'one-time-code');
         callbackUrl.searchParams.set('state', connectUrl.searchParams.get('state'));
-        await fetch(callbackUrl);
+        await new Promise((resolve, reject) => {
+          const request = http.get(
+            callbackUrl,
+            { agent: callbackAgent },
+            (response) => {
+              callbackConnectionHeader = response.headers.connection;
+              response.resume();
+              response.once('end', resolve);
+            }
+          );
+          request.once('error', reject);
+        });
         return true;
       },
+      onProgress: (message) => progress.push(message),
     });
+    const authorizationDurationMs = Date.now() - authorizationStartedAt;
 
     assert.equal(credentials.projectId, 'authorized-project');
     assert.equal(credentials.apiKey, 'authorized-secret');
@@ -398,7 +416,19 @@ test('completes loopback PKCE authorization and exchanges credentials', async ()
     assert.equal(exchangeBody.code, 'one-time-code');
     assert.match(exchangeBody.code_verifier, /^[A-Za-z0-9_-]{43,128}$/);
     assert.match(exchangeBody.redirect_uri, /^http:\/\/127\.0\.0\.1:/);
+    assert.equal(callbackConnectionHeader, 'close');
+    assert.ok(
+      authorizationDurationMs < 1_000,
+      `authorization took ${authorizationDurationMs}ms`
+    );
+    assert.deepEqual(progress, [
+      'Authorization callback received. Exchanging credentials...',
+      'Lexmount credentials received. Preparing project...',
+    ]);
   } finally {
+    callbackAgent.destroy();
+    exchangeServer.closeIdleConnections?.();
+    exchangeServer.closeAllConnections?.();
     await new Promise((resolve) => exchangeServer.close(resolve));
   }
 });
