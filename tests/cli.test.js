@@ -1,10 +1,25 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import {
+  authorizeWithBrowser,
+  discoverCredentials,
+  parseEnvFile,
+  resolveConnectBaseUrl,
+} from '../bin/auth.js';
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -24,37 +39,71 @@ function withTemporaryDirectory(run) {
   }
 }
 
-function runCli(cwd, args) {
+function runCli(cwd, args, extraEnv = {}) {
+  const env = { ...process.env };
+  for (const name of [
+    'LEXMOUNT_API_KEY',
+    'LEXMOUNT_PROJECT_ID',
+    'LEXMOUNT_BASE_URL',
+    'LEXMOUNT_BROWSER_CREDENTIALS_FILE',
+    'XDG_CONFIG_HOME',
+  ]) {
+    delete env[name];
+  }
   return spawnSync(process.execPath, [cliPath, ...args], {
     cwd,
     encoding: 'utf8',
+    env: { ...env, ...extraEnv },
   });
 }
 
-test('generates the exact web-check TypeScript command into the default directory', () => {
+function testCredentials(cwd, overrides = {}) {
+  return {
+    LEXMOUNT_API_KEY: 'sk_test_not_a_real_secret',
+    LEXMOUNT_PROJECT_ID: 'project_test',
+    LEXMOUNT_BASE_URL: 'https://api.lexmount.cn',
+    XDG_CONFIG_HOME: path.join(cwd, 'empty-config'),
+    ...overrides,
+  };
+}
+
+test('generates the screenshot TypeScript template and a protected local env', () => {
   withTemporaryDirectory((cwd) => {
     const result = runCli(cwd, [
       '--template',
-      'web-check',
+      'screenshot',
       '--language',
       'typescript',
       '--no-install',
-    ]);
+    ], testCredentials(cwd));
 
     assert.equal(result.status, 0, result.stderr);
-    const destination = path.join(cwd, 'lexmount-web-check');
+    const destination = path.join(cwd, 'lexmount-screenshot');
     const generatedPackage = JSON.parse(
       readFileSync(path.join(destination, 'package.json'), 'utf8')
     );
-    assert.equal(generatedPackage.name, 'lexmount-web-check');
+    assert.equal(generatedPackage.name, 'lexmount-screenshot');
+    assert.equal(generatedPackage.scripts.screenshot, 'tsx src/index.ts');
     assert.equal(generatedPackage.dependencies.lexmount, '^0.5.15');
     assert.match(
       readFileSync(path.join(destination, 'src', 'index.ts'), 'utf8'),
-      /recording: \{ persistent: true \}/
+      /client\.sessions\.create/
     );
     assert.match(
       readFileSync(path.join(destination, 'src', 'index.ts'), 'utf8'),
       /new Lexmount\(\{ region \}\)/
+    );
+    assert.match(
+      readFileSync(path.join(destination, 'src', 'index.ts'), 'utf8'),
+      /page\.goto\(targetUrl/
+    );
+    assert.match(
+      readFileSync(path.join(destination, 'src', 'index.ts'), 'utf8'),
+      /page\.screenshot/
+    );
+    assert.doesNotMatch(
+      readFileSync(path.join(destination, 'src', 'index.ts'), 'utf8'),
+      /EXPECTED_TEXT|matched|recording/
     );
     assert.match(
       readFileSync(path.join(destination, '.env.example'), 'utf8'),
@@ -68,6 +117,15 @@ test('generates the exact web-check TypeScript command into the default director
       readFileSync(path.join(destination, '.gitignore'), 'utf8'),
       /artifacts\//
     );
+    const generatedEnv = readFileSync(path.join(destination, '.env'), 'utf8');
+    assert.match(generatedEnv, /^LEXMOUNT_PROJECT_ID=project_test$/m);
+    assert.match(generatedEnv, /^LEXMOUNT_API_KEY=sk_test_not_a_real_secret$/m);
+    assert.match(generatedEnv, /^LEXMOUNT_BASE_URL=https:\/\/api\.lexmount\.cn$/m);
+    if (process.platform !== 'win32') {
+      assert.equal(statSync(path.join(destination, '.env')).mode & 0o777, 0o600);
+    }
+    assert.doesNotMatch(result.stdout, /sk_test_not_a_real_secret/);
+    assert.match(result.stdout, /API key hidden/);
   });
 });
 
@@ -75,10 +133,10 @@ test('supports a custom destination and renders a valid package name', () => {
   withTemporaryDirectory((cwd) => {
     const result = runCli(cwd, [
       'My Browser Check',
-      '--template=web-check',
+      '--template=screenshot',
       '--language=typescript',
       '--no-install',
-    ]);
+    ], testCredentials(cwd));
 
     assert.equal(result.status, 0, result.stderr);
     const generatedPackage = JSON.parse(
@@ -92,15 +150,31 @@ test('rejects unsupported languages with a useful message', () => {
   withTemporaryDirectory((cwd) => {
     const result = runCli(cwd, [
       '--template',
-      'web-check',
+      'screenshot',
       '--language',
       'python',
       '--no-install',
-    ]);
+    ], testCredentials(cwd));
 
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /Unsupported language for web-check: python/);
+    assert.match(result.stderr, /Unsupported language for screenshot: python/);
     assert.match(result.stderr, /Supported languages: typescript/);
+  });
+});
+
+test('rejects the retired web-check template name', () => {
+  withTemporaryDirectory((cwd) => {
+    const result = runCli(cwd, [
+      '--template',
+      'web-check',
+      '--language',
+      'typescript',
+      '--no-install',
+    ], testCredentials(cwd));
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Unsupported template: web-check/);
+    assert.match(result.stderr, /Supported templates: screenshot/);
   });
 });
 
@@ -112,14 +186,32 @@ test('refuses to overwrite a non-empty destination', () => {
     const result = runCli(cwd, [
       'existing',
       '--template',
-      'web-check',
+      'screenshot',
       '--language',
       'typescript',
       '--no-install',
-    ]);
+    ], testCredentials(cwd));
 
     assert.equal(result.status, 1);
     assert.match(result.stderr, /exists and is not a directory/);
+  });
+});
+
+test('--no-auth supports offline generation without creating .env', () => {
+  withTemporaryDirectory((cwd) => {
+    const result = runCli(cwd, [
+      '--template',
+      'screenshot',
+      '--language',
+      'typescript',
+      '--no-install',
+      '--no-auth',
+    ]);
+
+    assert.equal(result.status, 0, result.stderr);
+    const destination = path.join(cwd, 'lexmount-screenshot');
+    assert.equal(existsSync(path.join(destination, '.env')), false);
+    assert.match(result.stdout, /cp \.env\.example \.env/);
   });
 });
 
@@ -131,4 +223,115 @@ test('prints help and version without requiring template flags', () => {
   const version = runCli(repositoryRoot, ['--version']);
   assert.equal(version.status, 0, version.stderr);
   assert.equal(version.stdout.trim(), packageVersion);
+});
+
+test('parses exported and quoted dotenv credentials', () => {
+  assert.deepEqual(
+    parseEnvFile(
+      'export LEXMOUNT_API_KEY="secret"\nLEXMOUNT_PROJECT_ID=project-1\n'
+    ),
+    {
+      LEXMOUNT_API_KEY: 'secret',
+      LEXMOUNT_PROJECT_ID: 'project-1',
+    }
+  );
+});
+
+test('discovers matching browser-cli credentials without exposing values', () => {
+  withTemporaryDirectory((cwd) => {
+    const configRoot = path.join(cwd, 'config');
+    const credentialsDirectory = path.join(
+      configRoot,
+      'lexmount',
+      'browser-cli'
+    );
+    mkdirSync(credentialsDirectory, { recursive: true });
+    writeFileSync(
+      path.join(credentialsDirectory, 'credentials.json'),
+      JSON.stringify({
+        kind: 'api_key',
+        api_key: 'file-secret',
+        project_id: 'file-project',
+        api_base_url: 'https://api.lexmount.com',
+      })
+    );
+
+    const discovered = discoverCredentials({
+      cwd,
+      env: { XDG_CONFIG_HOME: configRoot },
+      homeDirectory: cwd,
+    });
+    assert.equal(discovered.credentials.source, 'browser-cli credentials');
+    assert.equal(discovered.credentials.projectId, 'file-project');
+    assert.equal(discovered.apiBaseUrl, 'https://api.lexmount.com');
+  });
+});
+
+test('maps office and qcloud-hk API hosts to their authorization consoles', () => {
+  assert.equal(
+    resolveConnectBaseUrl('https://apitest.local.lexmount.net'),
+    'https://test.local.lexmount.net'
+  );
+  assert.equal(
+    resolveConnectBaseUrl('https://api.lexmount.com'),
+    'https://browser.lexmount.com'
+  );
+  assert.equal(
+    resolveConnectBaseUrl('https://api.lexmount.cn'),
+    'https://browser.lexmount.cn'
+  );
+});
+
+test('completes loopback PKCE authorization and exchanges credentials', async () => {
+  let exchangeBody;
+  const exchangeServer = http.createServer((request, response) => {
+    let body = '';
+    request.setEncoding('utf8');
+    request.on('data', (chunk) => {
+      body += chunk;
+    });
+    request.on('end', () => {
+      exchangeBody = JSON.parse(body);
+      response.writeHead(200, { 'Content-Type': 'application/json' });
+      response.end(
+        JSON.stringify({
+          ok: true,
+          credential: {
+            api_key: 'authorized-secret',
+            project_id: 'authorized-project',
+            api_base_url: exchangeBaseUrl,
+          },
+        })
+      );
+    });
+  });
+  await new Promise((resolve) => exchangeServer.listen(0, '127.0.0.1', resolve));
+  const address = exchangeServer.address();
+  assert.ok(address && typeof address !== 'string');
+  const exchangeBaseUrl = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const credentials = await authorizeWithBrowser({
+      apiBaseUrl: exchangeBaseUrl,
+      connectBaseUrl: exchangeBaseUrl,
+      timeoutMs: 2_000,
+      openUrl: async (url) => {
+        const connectUrl = new URL(url);
+        const callbackUrl = new URL(connectUrl.searchParams.get('redirect_uri'));
+        callbackUrl.searchParams.set('code', 'one-time-code');
+        callbackUrl.searchParams.set('state', connectUrl.searchParams.get('state'));
+        await fetch(callbackUrl);
+        return true;
+      },
+    });
+
+    assert.equal(credentials.projectId, 'authorized-project');
+    assert.equal(credentials.apiKey, 'authorized-secret');
+    assert.equal(credentials.apiBaseUrl, exchangeBaseUrl);
+    assert.equal(exchangeBody.code, 'one-time-code');
+    assert.match(exchangeBody.code_verifier, /^[A-Za-z0-9_-]{43,128}$/);
+    assert.match(exchangeBody.redirect_uri, /^http:\/\/127\.0\.0\.1:/);
+  } finally {
+    await new Promise((resolve) => exchangeServer.close(resolve));
+  }
 });

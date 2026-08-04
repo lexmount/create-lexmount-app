@@ -7,12 +7,10 @@ import { chromium, type Browser } from 'playwright';
 
 config({ override: false });
 
-type WebCheckResult = {
-  matched: boolean;
+type ScreenshotResult = {
   title: string;
   final_url: string;
   screenshot: string;
-  replay: string;
 };
 
 function requiredInput(value: string | undefined, name: string): string {
@@ -33,18 +31,10 @@ function validateTargetUrl(value: string): string {
   return url.toString();
 }
 
-function sessionDetailUrl(sessionId: string): string {
-  const homeUrl = (
-    process.env.LEXMOUNT_HOME_URL ?? 'https://browser.lexmount.cn'
-  ).replace(/\/+$/, '');
-  return `${homeUrl}/settings/sessions/${encodeURIComponent(sessionId)}`;
-}
-
-async function runWebCheck(): Promise<WebCheckResult> {
+async function captureScreenshot(): Promise<ScreenshotResult> {
   const { values } = parseArgs({
     options: {
       url: { type: 'string' },
-      expected: { type: 'string' },
     },
     strict: true,
     allowPositionals: false,
@@ -52,10 +42,6 @@ async function runWebCheck(): Promise<WebCheckResult> {
 
   const targetUrl = validateTargetUrl(
     requiredInput(values.url ?? process.env.TARGET_URL, '--url / TARGET_URL')
-  );
-  const expectedText = requiredInput(
-    values.expected ?? process.env.EXPECTED_TEXT,
-    '--expected / EXPECTED_TEXT'
   );
   const artifactsDirectory = path.resolve(
     process.cwd(),
@@ -68,7 +54,6 @@ async function runWebCheck(): Promise<WebCheckResult> {
   const client = new Lexmount({ region });
   const session = await client.sessions.create({
     browserMode: 'normal',
-    recording: { persistent: true },
   });
   let browser: Browser | undefined;
 
@@ -81,10 +66,8 @@ async function runWebCheck(): Promise<WebCheckResult> {
       waitUntil: 'domcontentloaded',
       timeout: 60_000,
     });
-    const bodyText = await page.locator('body').innerText({ timeout: 15_000 });
     const title = await page.title();
     const finalUrl = page.url();
-    const matched = bodyText.includes(expectedText);
 
     await page.screenshot({
       path: screenshotPath,
@@ -92,11 +75,9 @@ async function runWebCheck(): Promise<WebCheckResult> {
     });
 
     return {
-      matched,
       title,
       final_url: finalUrl,
       screenshot: path.relative(process.cwd(), screenshotPath),
-      replay: sessionDetailUrl(session.id),
     };
   } finally {
     await browser?.close().catch(() => undefined);
@@ -105,15 +86,12 @@ async function runWebCheck(): Promise<WebCheckResult> {
   }
 }
 
-runWebCheck()
+captureScreenshot()
   .then((result) => {
     console.log(JSON.stringify(result, null, 2));
-    if (!result.matched) {
-      process.exitCode = 2;
-    }
   })
   .catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`Web check failed: ${message}`);
+    console.error(`Screenshot failed: ${message}`);
     process.exitCode = 1;
   });
