@@ -172,6 +172,27 @@ const templateDefinitions = new Map([
       ]),
     },
   ],
+  [
+    'download-files',
+    {
+      description: 'Download remote browser files locally with a manifest and ZIP archive.',
+      credentialSource: 'browser-cli',
+      connectIntent: 'scaffold-browser-example',
+      connectScopes: ['browser:sessions', 'browser:actions'],
+      languages: new Map([
+        [
+          'typescript',
+          {
+            run: {
+              label: 'remote file download example',
+              script: 'download',
+              args: ['--demo'],
+            },
+          },
+        ],
+      ]),
+    },
+  ],
 ]);
 const supportedTemplateNames = [...templateDefinitions.keys()].join(', ');
 const supportedLanguages = [
@@ -205,6 +226,7 @@ Examples:
   npx create-lexmount-app --template persistent-login-state --language typescript
   npx create-lexmount-app --template parallel-browser-sessions --language typescript
   npx create-lexmount-app --template human-in-the-loop --language typescript
+  npx create-lexmount-app --template download-files --language typescript
 `;
 
 function readOptionValue(argv, index, optionName) {

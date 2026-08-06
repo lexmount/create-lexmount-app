@@ -117,6 +117,17 @@ This creates `lexmount-human-in-the-loop/`, pauses one Session at a controlled
 checkpoint, prints its Remote View URL, waits for the person to click
 **批准并继续**, and then resumes automation in that same Session.
 
+To retrieve files created inside a remote browser Session, generate the
+downloads template:
+
+```bash
+npx create-lexmount-app --template download-files --language typescript
+```
+
+This creates `lexmount-download-files/`, runs a controlled CSV download in a
+downloads-enabled Session, retrieves the file and ZIP through the Downloads
+API, verifies their metadata, and writes an auditable JSON manifest locally.
+
 During browser authorization, the CLI prints progress when the loopback
 callback arrives and when credential exchange finishes. The callback response
 closes its localhost connection explicitly, so a browser keep-alive connection
@@ -133,6 +144,7 @@ cannot delay dependency installation.
 | `persistent-login-state` | `typescript` | Reuse Cookie and Local Storage state across separate browser Sessions. |
 | `parallel-browser-sessions` | `typescript` | Process a URL batch in isolated Sessions with bounded concurrency. |
 | `human-in-the-loop` | `typescript` | Pause for human approval and resume automation in the same Session. |
+| `download-files` | `typescript` | Download remote browser files locally with a manifest and ZIP archive. |
 
 ## CLI options
 
