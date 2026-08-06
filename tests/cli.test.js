@@ -48,7 +48,9 @@ function runCli(cwd, args, extraEnv = {}) {
     'LEXMOUNT_API_KEY',
     'LEXMOUNT_PROJECT_ID',
     'LEXMOUNT_BASE_URL',
+    'LEXMOUNT_WEBFETCH_BASE_URL',
     'LEXMOUNT_BROWSER_CREDENTIALS_FILE',
+    'LEXMOUNT_WEBFETCH_CREDENTIALS_FILE',
     'XDG_CONFIG_HOME',
   ]) {
     delete env[name];
@@ -68,6 +70,23 @@ function testCredentials(cwd, overrides = {}) {
     XDG_CONFIG_HOME: path.join(cwd, 'empty-config'),
     ...overrides,
   };
+}
+
+function createFakeNpm(cwd) {
+  const binDirectory = path.join(cwd, 'bin');
+  const logPath = path.join(cwd, 'package-manager.log');
+  mkdirSync(binDirectory);
+  const npmPath = path.join(
+    binDirectory,
+    process.platform === 'win32' ? 'npm.cmd' : 'npm'
+  );
+  const contents =
+    process.platform === 'win32'
+      ? '@echo off\r\n>>"%FAKE_NPM_LOG%" echo %*\r\n'
+      : '#!/bin/sh\nprintf "%s\\n" "$*" >> "$FAKE_NPM_LOG"\n';
+  writeFileSync(npmPath, contents);
+  if (process.platform !== 'win32') chmodSync(npmPath, 0o755);
+  return { binDirectory, logPath };
 }
 
 test('generates the screenshot TypeScript template and a protected local env', () => {
@@ -137,6 +156,55 @@ test('generates the screenshot TypeScript template and a protected local env', (
   });
 });
 
+test('generates the WebFetch webpage-to-json TypeScript template', () => {
+  withTemporaryDirectory((cwd) => {
+    const result = runCli(
+      cwd,
+      [
+        '--template',
+        'webpage-to-json',
+        '--language',
+        'typescript',
+        '--no-install',
+      ],
+      testCredentials(cwd)
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    const destination = path.join(cwd, 'lexmount-webpage-to-json');
+    const generatedPackage = JSON.parse(
+      readFileSync(path.join(destination, 'package.json'), 'utf8')
+    );
+    assert.equal(generatedPackage.name, 'lexmount-webpage-to-json');
+    assert.equal(generatedPackage.scripts.extract, 'tsx src/index.ts');
+    assert.equal(generatedPackage.dependencies.dotenv, '^16.5.0');
+    assert.equal(generatedPackage.dependencies.lexmount, undefined);
+    assert.equal(generatedPackage.dependencies.playwright, undefined);
+    assert.equal(generatedPackage.allowScripts.esbuild, true);
+
+    const generatedSource = readFileSync(
+      path.join(destination, 'src', 'index.ts'),
+      'utf8'
+    );
+    assert.match(generatedSource, /\/v1\/extract/);
+    assert.match(generatedSource, /'X-API-Key': apiKey/);
+    assert.match(generatedSource, /'X-Project-Id': projectId/);
+    assert.match(generatedSource, /main_text: result\.main_text/);
+    assert.match(generatedSource, /links: result\.links/);
+    assert.match(generatedSource, /images: result\.images/);
+    assert.doesNotMatch(generatedSource, /sessions\.create|connectOverCDP|playwright/);
+
+    const generatedEnv = readFileSync(path.join(destination, '.env'), 'utf8');
+    assert.match(generatedEnv, /^LEXMOUNT_PROJECT_ID=project_test$/m);
+    assert.match(generatedEnv, /^LEXMOUNT_API_KEY=sk_test_not_a_real_secret$/m);
+    assert.match(
+      readFileSync(path.join(destination, '.gitignore'), 'utf8'),
+      /^\.env$/m
+    );
+    assert.doesNotMatch(result.stdout, /sk_test_not_a_real_secret/);
+  });
+});
+
 test('supports a custom destination and renders a valid package name', () => {
   withTemporaryDirectory((cwd) => {
     const result = runCli(cwd, [
@@ -182,7 +250,10 @@ test('rejects the retired web-check template name', () => {
 
     assert.equal(result.status, 1);
     assert.match(result.stderr, /Unsupported template: web-check/);
-    assert.match(result.stderr, /Supported templates: screenshot/);
+    assert.match(
+      result.stderr,
+      /Supported templates: screenshot, webpage-to-json/
+    );
   });
 });
 
@@ -225,15 +296,7 @@ test('--no-auth supports offline generation without creating .env', () => {
 
 test('installs and immediately runs the generated screenshot example', () => {
   withTemporaryDirectory((cwd) => {
-    const binDirectory = path.join(cwd, 'bin');
-    const logPath = path.join(cwd, 'package-manager.log');
-    mkdirSync(binDirectory);
-    const npmPath = path.join(binDirectory, 'npm');
-    writeFileSync(
-      npmPath,
-      '#!/bin/sh\nprintf "%s\\n" "$*" >> "$FAKE_NPM_LOG"\n'
-    );
-    chmodSync(npmPath, 0o755);
+    const { binDirectory, logPath } = createFakeNpm(cwd);
 
     const result = runCli(
       cwd,
@@ -247,14 +310,39 @@ test('installs and immediately runs the generated screenshot example', () => {
 
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(
-      readFileSync(logPath, 'utf8').trim().split('\n'),
+      readFileSync(logPath, 'utf8').trim().split(/\r?\n/),
       [
         'install',
         'run screenshot -- --url https://example.com',
       ]
     );
-    assert.match(result.stdout, /Running screenshot example for https:\/\/example\.com/);
+    assert.match(result.stdout, /Running screenshot example/);
     assert.doesNotMatch(result.stdout, /Next steps:/);
+    assert.doesNotMatch(result.stderr, /DEP0190/);
+  });
+});
+
+test('installs and immediately runs the generated WebFetch example', () => {
+  withTemporaryDirectory((cwd) => {
+    const { binDirectory, logPath } = createFakeNpm(cwd);
+
+    const result = runCli(
+      cwd,
+      ['--template', 'webpage-to-json', '--language', 'typescript'],
+      testCredentials(cwd, {
+        FAKE_NPM_LOG: logPath,
+        PATH: `${binDirectory}${path.delimiter}${process.env.PATH ?? ''}`,
+        npm_config_user_agent: 'npm/10.0.0 node/v22.0.0',
+      })
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(readFileSync(logPath, 'utf8').trim().split(/\r?\n/), [
+      'install',
+      'run extract -- --url https://example.com',
+    ]);
+    assert.match(result.stdout, /Running WebFetch extraction example/);
+    assert.doesNotMatch(result.stderr, /DEP0190/);
   });
 });
 
@@ -262,6 +350,7 @@ test('prints help and version without requiring template flags', () => {
   const help = runCli(repositoryRoot, ['--help']);
   assert.equal(help.status, 0, help.stderr);
   assert.match(help.stdout, /--template <name>/);
+  assert.match(help.stdout, /webpage-to-json/);
 
   const version = runCli(repositoryRoot, ['--version']);
   assert.equal(version.status, 0, version.stderr);
@@ -306,6 +395,51 @@ test('discovers matching browser-cli credentials without exposing values', () =>
     });
     assert.equal(discovered.credentials.source, 'browser-cli credentials');
     assert.equal(discovered.credentials.projectId, 'file-project');
+    assert.equal(discovered.apiBaseUrl, 'https://api.lexmount.com');
+  });
+});
+
+test('discovers webfetch-cli credentials', () => {
+  withTemporaryDirectory((cwd) => {
+    const configRoot = path.join(cwd, 'config');
+    const browserCredentialsDirectory = path.join(
+      configRoot,
+      'lexmount',
+      'browser-cli'
+    );
+    const credentialsDirectory = path.join(
+      configRoot,
+      'lexmount',
+      'webfetch-cli'
+    );
+    mkdirSync(browserCredentialsDirectory, { recursive: true });
+    mkdirSync(credentialsDirectory, { recursive: true });
+    writeFileSync(
+      path.join(browserCredentialsDirectory, 'credentials.json'),
+      JSON.stringify({
+        kind: 'api_key',
+        api_key: 'browser-secret',
+        project_id: 'browser-project',
+        api_base_url: 'https://api.lexmount.cn',
+      })
+    );
+    writeFileSync(
+      path.join(credentialsDirectory, 'credentials.json'),
+      JSON.stringify({
+        api_key: 'webfetch-secret',
+        project_id: 'webfetch-project',
+        api_base_url: 'https://api.lexmount.com',
+      })
+    );
+
+    const discovered = discoverCredentials({
+      cwd,
+      env: { XDG_CONFIG_HOME: configRoot },
+      homeDirectory: cwd,
+      preferredCli: 'webfetch-cli',
+    });
+    assert.equal(discovered.credentials.source, 'webfetch-cli credentials');
+    assert.equal(discovered.credentials.projectId, 'webfetch-project');
     assert.equal(discovered.apiBaseUrl, 'https://api.lexmount.com');
   });
 });
@@ -386,9 +520,13 @@ test('completes loopback PKCE authorization and exchanges credentials', async ()
     const credentials = await authorizeWithBrowser({
       apiBaseUrl: exchangeBaseUrl,
       connectBaseUrl: exchangeBaseUrl,
+      intent: 'scaffold-webfetch-example',
+      scopes: ['browser:read'],
       timeoutMs: 2_000,
       openUrl: async (url) => {
         const connectUrl = new URL(url);
+        assert.equal(connectUrl.searchParams.get('intent'), 'scaffold-webfetch-example');
+        assert.equal(connectUrl.searchParams.get('scope'), 'browser:read');
         const callbackUrl = new URL(connectUrl.searchParams.get('redirect_uri'));
         callbackUrl.searchParams.set('code', 'one-time-code');
         callbackUrl.searchParams.set('state', connectUrl.searchParams.get('state'));

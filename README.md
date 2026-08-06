@@ -1,6 +1,6 @@
 # create-lexmount-app
 
-Scaffold runnable Lexmount browser automation examples from the Templates
+Scaffold runnable Lexmount Browser and WebFetch examples from the Templates
 catalog.
 
 ## Quick start
@@ -16,8 +16,9 @@ order:
 
 1. current `LEXMOUNT_API_KEY` + `LEXMOUNT_PROJECT_ID` environment variables;
 2. `.env.local` or `.env` in the current directory;
-3. the local browser-cli credentials file;
-4. a browser-based loopback + PKCE authorization flow.
+3. the local browser-cli or webfetch-cli credentials file;
+4. a browser-based loopback + PKCE authorization flow using the permissions
+   required by the selected template.
 
 The generated `.env` is ignored by Git, written with mode `0600` on POSIX, and
 the API key is never printed. To choose another destination directory, pass it
@@ -46,6 +47,18 @@ session, prints its inspect URL before connecting or navigating, navigates with
 Playwright, writes `artifacts/screenshot.png`, and prints the title, final URL,
 and screenshot path as structured JSON.
 
+For structured content without browser interaction, generate the WebFetch
+template instead:
+
+```bash
+npx create-lexmount-app --template webpage-to-json --language typescript
+```
+
+This creates `lexmount-webpage-to-json/`, sends one WebFetch request for
+`https://example.com`, and prints structured JSON containing the title, main
+text, links, images, and related metadata. It does not create a Browser Session
+or install Playwright.
+
 During browser authorization, the CLI prints progress when the loopback
 callback arrives and when credential exchange finishes. The callback response
 closes its localhost connection explicitly, so a browser keep-alive connection
@@ -56,6 +69,7 @@ cannot delay dependency installation.
 | Template | Language | Description |
 | --- | --- | --- |
 | `screenshot` | `typescript` | Navigate to a URL and capture a full-page screenshot. |
+| `webpage-to-json` | `typescript` | Extract structured JSON from a public webpage with WebFetch. |
 
 ## CLI options
 

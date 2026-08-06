@@ -1,7 +1,7 @@
 {
   "name": "create-lexmount-app",
   "version": "0.1.4",
-  "description": "Scaffold runnable Lexmount browser automation templates",
+  "description": "Scaffold runnable Lexmount Browser and WebFetch templates",
   "type": "module",
   "bin": {
     "create-lexmount-app": "bin/create-lexmount-app.js"
@@ -22,6 +22,7 @@
   "keywords": [
     "lexmount",
     "browser-automation",
+    "webfetch",
     "playwright",
     "scaffold"
   ],
