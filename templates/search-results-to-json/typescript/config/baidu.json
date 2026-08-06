@@ -1,0 +1,47 @@
+{
+  "name": "baidu",
+  "start_url": "https://www.baidu.com/",
+  "default_query": "Lexmount browser",
+  "default_limit": 5,
+  "timeout_ms": 60000,
+  "search": {
+    "input": {
+      "by": "role",
+      "role": "textbox"
+    },
+    "submit": {
+      "by": "role",
+      "role": "button",
+      "name": "百度一下",
+      "exact": true
+    }
+  },
+  "waits": [
+    {
+      "type": "url",
+      "value": "/s?",
+      "match": "contains"
+    },
+    {
+      "type": "visible",
+      "locator": {
+        "by": "css",
+        "value": "#content_left"
+      }
+    }
+  ],
+  "results": {
+    "item": {
+      "by": "css",
+      "value": "#content_left .result, #content_left .result-op"
+    },
+    "title": {
+      "by": "css",
+      "value": "h3"
+    },
+    "link": {
+      "by": "css",
+      "value": "h3 a"
+    }
+  }
+}

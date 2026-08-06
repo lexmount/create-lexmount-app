@@ -23,10 +23,185 @@ const packageMetadata = JSON.parse(
   readFileSync(path.join(packageRoot, 'package.json'), 'utf8')
 );
 
-const supportedTemplates = new Map([
-  ['screenshot', new Set(['typescript'])],
+const DEFAULT_EXAMPLE_URL = 'https://example.com';
+const templateDefinitions = new Map([
+  [
+    'screenshot',
+    {
+      description: 'Navigate to a URL and capture a full-page screenshot.',
+      credentialSource: 'browser-cli',
+      connectIntent: 'scaffold-browser-example',
+      connectScopes: ['browser:sessions', 'browser:actions'],
+      languages: new Map([
+        [
+          'typescript',
+          {
+            run: {
+              label: 'screenshot example',
+              script: 'screenshot',
+              args: ['--url', DEFAULT_EXAMPLE_URL],
+            },
+          },
+        ],
+      ]),
+    },
+  ],
+  [
+    'webpage-to-json',
+    {
+      description: 'Extract structured JSON from a public webpage with WebFetch.',
+      credentialSource: 'webfetch-cli',
+      connectIntent: 'scaffold-webfetch-example',
+      connectScopes: ['browser:read'],
+      languages: new Map([
+        [
+          'typescript',
+          {
+            run: {
+              label: 'WebFetch extraction example',
+              script: 'extract',
+              args: ['--url', DEFAULT_EXAMPLE_URL],
+            },
+          },
+        ],
+      ]),
+    },
+  ],
+  [
+    'search-results-to-json',
+    {
+      description: 'Search a page and save the first N results as structured JSON.',
+      credentialSource: 'browser-cli',
+      connectIntent: 'scaffold-browser-example',
+      connectScopes: ['browser:sessions', 'browser:actions'],
+      languages: new Map([
+        [
+          'typescript',
+          {
+            run: {
+              label: 'search results extraction example',
+              script: 'search',
+              args: ['--query', 'Lexmount browser', '--limit', '3'],
+            },
+          },
+        ],
+      ]),
+    },
+  ],
+  [
+    'web-check',
+    {
+      description: 'Run a JSON web checklist and keep a persistent Recording for replay.',
+      credentialSource: 'browser-cli',
+      connectIntent: 'scaffold-browser-example',
+      connectScopes: ['browser:sessions', 'browser:actions'],
+      languages: new Map([
+        [
+          'typescript',
+          {
+            run: {
+              label: 'recorded web check example',
+              script: 'check:web',
+              args: [],
+            },
+          },
+        ],
+      ]),
+    },
+  ],
+  [
+    'persistent-login-state',
+    {
+      description: 'Reuse Cookie and Local Storage state across separate browser Sessions.',
+      credentialSource: 'browser-cli',
+      connectIntent: 'scaffold-browser-example',
+      connectScopes: ['browser:sessions', 'browser:actions'],
+      languages: new Map([
+        [
+          'typescript',
+          {
+            run: {
+              label: 'persistent login state example',
+              script: 'demo',
+              args: ['--url', DEFAULT_EXAMPLE_URL],
+            },
+          },
+        ],
+      ]),
+    },
+  ],
+  [
+    'parallel-browser-sessions',
+    {
+      description: 'Process a URL batch in isolated browser Sessions with bounded concurrency.',
+      credentialSource: 'browser-cli',
+      connectIntent: 'scaffold-browser-example',
+      connectScopes: ['browser:sessions', 'browser:actions'],
+      languages: new Map([
+        [
+          'typescript',
+          {
+            run: {
+              label: 'parallel browser sessions example',
+              script: 'browse',
+              args: [],
+            },
+          },
+        ],
+      ]),
+    },
+  ],
+  [
+    'human-in-the-loop',
+    {
+      description: 'Pause for human approval and resume automation in the same Session.',
+      credentialSource: 'browser-cli',
+      connectIntent: 'scaffold-browser-example',
+      connectScopes: ['browser:sessions', 'browser:actions'],
+      languages: new Map([
+        [
+          'typescript',
+          {
+            run: {
+              label: 'human handoff example',
+              script: 'handoff',
+              args: [],
+            },
+          },
+        ],
+      ]),
+    },
+  ],
+  [
+    'download-files',
+    {
+      description: 'Download remote browser files locally with a manifest and ZIP archive.',
+      credentialSource: 'browser-cli',
+      connectIntent: 'scaffold-browser-example',
+      connectScopes: ['browser:sessions', 'browser:actions'],
+      languages: new Map([
+        [
+          'typescript',
+          {
+            run: {
+              label: 'remote file download example',
+              script: 'download',
+              args: ['--demo'],
+            },
+          },
+        ],
+      ]),
+    },
+  ],
 ]);
-const DEFAULT_SCREENSHOT_URL = 'https://example.com';
+const supportedTemplateNames = [...templateDefinitions.keys()].join(', ');
+const supportedLanguages = [
+  ...new Set(
+    [...templateDefinitions.values()].flatMap((definition) => [
+      ...definition.languages.keys(),
+    ])
+  ),
+].join(', ');
 
 const helpText = `create-lexmount-app
 
@@ -34,8 +209,8 @@ Usage:
   create-lexmount-app [directory] --template <name> --language <language>
 
 Options:
-  --template <name>       Template to generate (supported: screenshot)
-  --language <language>   Template language (supported: typescript)
+  --template <name>       Template to generate (supported: ${supportedTemplateNames})
+  --language <language>   Template language (supported: ${supportedLanguages})
   --no-install            Generate files without installing dependencies or running the example
   --no-auth               Skip local credential discovery and browser authorization
   --connect-base-url      Override the Lexmount console used for authorization
@@ -45,6 +220,13 @@ Options:
 Examples:
   npx create-lexmount-app --template screenshot --language typescript
   npx create-lexmount-app my-screenshot --template screenshot --language typescript
+  npx create-lexmount-app --template webpage-to-json --language typescript
+  npx create-lexmount-app --template search-results-to-json --language typescript
+  npx create-lexmount-app --template web-check --language typescript
+  npx create-lexmount-app --template persistent-login-state --language typescript
+  npx create-lexmount-app --template parallel-browser-sessions --language typescript
+  npx create-lexmount-app --template human-in-the-loop --language typescript
+  npx create-lexmount-app --template download-files --language typescript
 `;
 
 function readOptionValue(argv, index, optionName) {
@@ -140,21 +322,21 @@ function validateSelection(template, language) {
     throw new Error('--language is required');
   }
 
-  const languages = supportedTemplates.get(template);
-  if (!languages) {
+  const templateDefinition = templateDefinitions.get(template);
+  if (!templateDefinition) {
     throw new Error(
-      `Unsupported template: ${template}. Supported templates: ${[
-        ...supportedTemplates.keys(),
-      ].join(', ')}`
+      `Unsupported template: ${template}. Supported templates: ${supportedTemplateNames}`
     );
   }
-  if (!languages.has(language)) {
+  const languageDefinition = templateDefinition.languages.get(language);
+  if (!languageDefinition) {
     throw new Error(
       `Unsupported language for ${template}: ${language}. Supported languages: ${[
-        ...languages,
+        ...templateDefinition.languages.keys(),
       ].join(', ')}`
     );
   }
+  return { templateDefinition, languageDefinition };
 }
 
 function toPackageName(directoryName) {
@@ -220,16 +402,26 @@ function detectPackageManager() {
   return 'npm';
 }
 
+function runPackageManager(packageManager, args, options) {
+  if (process.platform === 'win32') {
+    return spawnSync(
+      process.env.ComSpec || 'cmd.exe',
+      ['/d', '/s', '/c', packageManager, ...args],
+      options
+    );
+  }
+
+  return spawnSync(packageManager, args, options);
+}
+
 function installDependencies(destination) {
   const packageManager = detectPackageManager();
-  const command = packageManager;
   const args = packageManager === 'yarn' ? [] : ['install'];
 
   console.log(`\nInstalling dependencies with ${packageManager}...`);
-  const result = spawnSync(command, args, {
+  const result = runPackageManager(packageManager, args, {
     cwd: destination,
     stdio: 'inherit',
-    shell: process.platform === 'win32',
   });
   if (result.error) {
     throw new Error(`Failed to start ${packageManager}: ${result.error.message}`);
@@ -240,25 +432,24 @@ function installDependencies(destination) {
   return packageManager;
 }
 
-function runScreenshotExample(destination, packageManager) {
-  console.log(`\nRunning screenshot example for ${DEFAULT_SCREENSHOT_URL}...`);
-  const result = spawnSync(
+function runGeneratedExample(destination, packageManager, run) {
+  console.log(`\nRunning ${run.label}...`);
+  const result = runPackageManager(
     packageManager,
-    ['run', 'screenshot', '--', '--url', DEFAULT_SCREENSHOT_URL],
+    ['run', run.script, '--', ...run.args],
     {
       cwd: destination,
       stdio: 'inherit',
-      shell: process.platform === 'win32',
     }
   );
   if (result.error) {
     throw new Error(
-      `Failed to start the screenshot example with ${packageManager}: ${result.error.message}`
+      `Failed to start the ${run.label} with ${packageManager}: ${result.error.message}`
     );
   }
   if (result.status !== 0) {
     throw new Error(
-      `Screenshot example failed with exit code ${result.status}`
+      `${run.label} failed with exit code ${result.status}`
     );
   }
 }
@@ -267,12 +458,13 @@ function printManualRunInstructions(
   destination,
   packageManager,
   installed,
-  credentialsConfigured
+  credentialsConfigured,
+  run
 ) {
   const relativeDestination = path.relative(process.cwd(), destination) || '.';
   const runPrefix = packageManager === 'npm' ? 'npm run' : packageManager;
 
-  console.log('\nThe screenshot example was not run automatically:');
+  console.log(`\nThe ${run.label} was not run automatically:`);
   if (relativeDestination !== '.') {
     console.log(`  cd ${relativeDestination}`);
   }
@@ -283,7 +475,7 @@ function printManualRunInstructions(
   if (!installed) {
     console.log(`  ${packageManager} install`);
   }
-  console.log(`  ${runPrefix} screenshot -- --url ${DEFAULT_SCREENSHOT_URL}`);
+  console.log(`  ${runPrefix} ${run.script} -- ${run.args.join(' ')}`);
 }
 
 async function main(argv) {
@@ -297,7 +489,7 @@ async function main(argv) {
     return;
   }
 
-  validateSelection(options.template, options.language);
+  const selection = validateSelection(options.template, options.language);
 
   const directory = options.directory ?? `lexmount-${options.template}`;
   const destination = path.resolve(process.cwd(), directory);
@@ -305,7 +497,9 @@ async function main(argv) {
 
   let credentials;
   if (options.auth) {
-    const discovered = discoverCredentials();
+    const discovered = discoverCredentials({
+      preferredCli: selection.templateDefinition.credentialSource,
+    });
     credentials = discovered.credentials;
     if (credentials) {
       credentials = {
@@ -324,6 +518,8 @@ async function main(argv) {
       credentials = await authorizeWithBrowser({
         apiBaseUrl: discovered.apiBaseUrl,
         connectBaseUrl,
+        intent: selection.templateDefinition.connectIntent,
+        scopes: selection.templateDefinition.connectScopes,
         onProgress: (message) => console.log(message),
         onManualUrl: (url) => {
           console.log('Open this URL in your browser to continue:');
@@ -359,13 +555,18 @@ async function main(argv) {
   }
   console.log(`\nCreated Lexmount app in ${destination}`);
   if (options.install && credentials) {
-    runScreenshotExample(destination, packageManager);
+    runGeneratedExample(
+      destination,
+      packageManager,
+      selection.languageDefinition.run
+    );
   } else {
     printManualRunInstructions(
       destination,
       packageManager,
       options.install,
-      Boolean(credentials)
+      Boolean(credentials),
+      selection.languageDefinition.run
     );
   }
 }

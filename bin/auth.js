@@ -116,6 +116,40 @@ function readBrowserCliCredentials(env, homeDirectory) {
   };
 }
 
+function webfetchCliCredentialsPath(env, homeDirectory) {
+  if (oneLine(env.LEXMOUNT_WEBFETCH_CREDENTIALS_FILE)) {
+    return path.resolve(env.LEXMOUNT_WEBFETCH_CREDENTIALS_FILE);
+  }
+  const configRoot = oneLine(env.XDG_CONFIG_HOME)
+    ? path.resolve(env.XDG_CONFIG_HOME)
+    : path.join(homeDirectory, '.config');
+  return path.join(configRoot, 'lexmount', 'webfetch-cli', 'credentials.json');
+}
+
+function readWebfetchCliCredentials(env, homeDirectory) {
+  const filePath = webfetchCliCredentialsPath(env, homeDirectory);
+  if (!existsSync(filePath)) return undefined;
+
+  let data;
+  try {
+    data = JSON.parse(readFileSync(filePath, 'utf8'));
+  } catch {
+    return undefined;
+  }
+  if (!data || typeof data !== 'object') return undefined;
+
+  const apiKey = oneLine(data.api_key);
+  const projectId = oneLine(data.project_id);
+  if (!apiKey || !projectId) return undefined;
+
+  return {
+    apiKey,
+    projectId,
+    apiBaseUrl: oneLine(data.api_base_url),
+    source: 'webfetch-cli credentials',
+  };
+}
+
 function credentialPair(values, source) {
   const apiKey = oneLine(values.LEXMOUNT_API_KEY);
   const projectId = oneLine(values.LEXMOUNT_PROJECT_ID);
@@ -123,7 +157,9 @@ function credentialPair(values, source) {
   return {
     apiKey,
     projectId,
-    apiBaseUrl: oneLine(values.LEXMOUNT_BASE_URL),
+    apiBaseUrl:
+      oneLine(values.LEXMOUNT_BASE_URL) ||
+      oneLine(values.LEXMOUNT_WEBFETCH_BASE_URL),
     source,
   };
 }
@@ -139,18 +175,27 @@ export function discoverCredentials({
   cwd = process.cwd(),
   env = process.env,
   homeDirectory = os.homedir(),
+  preferredCli = 'browser-cli',
 } = {}) {
   const localEnv = readLocalEnv(cwd);
   const explicitApiBaseUrl =
     oneLine(env.LEXMOUNT_BASE_URL) ||
-    oneLine(localEnv?.values.LEXMOUNT_BASE_URL);
+    oneLine(env.LEXMOUNT_WEBFETCH_BASE_URL) ||
+    oneLine(localEnv?.values.LEXMOUNT_BASE_URL) ||
+    oneLine(localEnv?.values.LEXMOUNT_WEBFETCH_BASE_URL);
 
+  const browserCliCredentials = readBrowserCliCredentials(env, homeDirectory);
+  const webfetchCliCredentials = readWebfetchCliCredentials(env, homeDirectory);
+  const cliCandidates =
+    preferredCli === 'webfetch-cli'
+      ? [webfetchCliCredentials, browserCliCredentials]
+      : [browserCliCredentials, webfetchCliCredentials];
   const candidates = [
     credentialPair(env, 'environment'),
     localEnv
       ? credentialPair(localEnv.values, localEnv.names.join(' + '))
       : undefined,
-    readBrowserCliCredentials(env, homeDirectory),
+    ...cliCandidates,
   ].filter(Boolean);
 
   for (const candidate of candidates) {
@@ -394,6 +439,8 @@ async function exchangeCode({
 export async function authorizeWithBrowser({
   apiBaseUrl,
   connectBaseUrl,
+  intent = 'scaffold-browser-example',
+  scopes = CONNECT_SCOPE,
   openUrl = openExternalUrl,
   fetchImpl = fetch,
   timeoutMs = AUTH_TIMEOUT_MS,
@@ -408,6 +455,16 @@ export async function authorizeWithBrowser({
     normalizedApiBaseUrl,
     connectBaseUrl
   );
+  const normalizedIntent = oneLine(intent);
+  const normalizedScopes = Array.isArray(scopes)
+    ? scopes.map((scope) => oneLine(scope)).filter(Boolean)
+    : [];
+  if (!normalizedIntent) {
+    throw new Error('Authorization intent must be a single-line value');
+  }
+  if (normalizedScopes.length === 0) {
+    throw new Error('At least one authorization scope is required');
+  }
   const verifier = pkceVerifier();
   const state = randomBytes(32).toString('base64url');
   const { server, callback } = createCallbackServer(state);
@@ -425,10 +482,10 @@ export async function authorizeWithBrowser({
   const redirectUri = `http://127.0.0.1:${address.port}/callback`;
   const connectUrl = new URL('/connect/codex', `${normalizedConnectBaseUrl}/`);
   connectUrl.searchParams.set('source', 'create-lexmount-app');
-  connectUrl.searchParams.set('intent', 'scaffold-browser-example');
+  connectUrl.searchParams.set('intent', normalizedIntent);
   connectUrl.searchParams.set('response', 'code');
   connectUrl.searchParams.set('expires_in', '7d');
-  connectUrl.searchParams.set('scope', CONNECT_SCOPE.join(' '));
+  connectUrl.searchParams.set('scope', normalizedScopes.join(' '));
   connectUrl.searchParams.set('client_name', 'create-lexmount-app');
   connectUrl.searchParams.set('redirect_uri', redirectUri);
   connectUrl.searchParams.set('state', state);

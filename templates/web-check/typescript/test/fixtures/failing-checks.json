@@ -1,0 +1,19 @@
+{
+  "name": "intentional-assertion-failure",
+  "url": "https://example.com",
+  "checks": [
+    {
+      "action": "goto"
+    },
+    {
+      "action": "expectTitle",
+      "value": "This title is intentionally wrong",
+      "match": "equals"
+    },
+    {
+      "action": "expectText",
+      "selector": "body",
+      "value": "This step must be skipped"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # create-lexmount-app
 
-Scaffold runnable Lexmount browser automation examples from the Templates
+Scaffold runnable Lexmount Browser and WebFetch examples from the Templates
 catalog.
 
 ## Quick start
@@ -16,8 +16,9 @@ order:
 
 1. current `LEXMOUNT_API_KEY` + `LEXMOUNT_PROJECT_ID` environment variables;
 2. `.env.local` or `.env` in the current directory;
-3. the local browser-cli credentials file;
-4. a browser-based loopback + PKCE authorization flow.
+3. the local browser-cli or webfetch-cli credentials file;
+4. a browser-based loopback + PKCE authorization flow using the permissions
+   required by the selected template.
 
 The generated `.env` is ignored by Git, written with mode `0600` on POSIX, and
 the API key is never printed. To choose another destination directory, pass it
@@ -46,6 +47,87 @@ session, prints its inspect URL before connecting or navigating, navigates with
 Playwright, writes `artifacts/screenshot.png`, and prints the title, final URL,
 and screenshot path as structured JSON.
 
+For structured content without browser interaction, generate the WebFetch
+template instead:
+
+```bash
+npx create-lexmount-app --template webpage-to-json --language typescript
+```
+
+This creates `lexmount-webpage-to-json/`, sends one WebFetch request for
+`https://example.com`, and prints structured JSON containing the title, main
+text, links, images, and related metadata. It does not create a Browser Session
+or install Playwright.
+
+For a page that must be searched interactively, generate the browser search
+template:
+
+```bash
+npx create-lexmount-app --template search-results-to-json --language typescript
+```
+
+This creates `lexmount-search-results-to-json/`, opens Baidu in a temporary
+Lexmount Browser Session, fills and submits a search through Playwright, waits
+for the results page, and saves the first three title/link/summary records to
+`artifacts/search-results.json`. Edit `config/baidu.json` to target another
+site or replace its role, label, text, CSS, and wait rules.
+
+For a repeatable browser check with a replayable Recording, generate the web
+check template:
+
+```bash
+npx create-lexmount-app --template web-check --language typescript
+```
+
+This creates `lexmount-web-check/`, runs the JSON checklist in
+`inputs/checks.json`, saves a machine-readable report to `artifacts/`, and
+closes the Session after preserving its persistent Recording for Replay.
+
+To prove that login state can survive across separate browser Sessions,
+generate the persistent Context template:
+
+```bash
+npx create-lexmount-app --template persistent-login-state --language typescript
+```
+
+This creates `lexmount-persistent-login-state/`, writes safe demo Cookie and
+Local Storage markers in one Session, verifies them in a second Session, and
+keeps the Context available for later tasks. Run `npm run cleanup` when you no
+longer need that demo Context.
+
+To process several public pages at the same time without sharing browser state,
+generate the parallel Sessions template:
+
+```bash
+npx create-lexmount-app --template parallel-browser-sessions --language typescript
+```
+
+This creates `lexmount-parallel-browser-sessions/`, distributes the URLs in
+`inputs/urls.json` across isolated Sessions with bounded concurrency, and saves
+successful results, failures, and Session lifecycle counts as JSON.
+
+For a workflow that must pause until a person approves it, generate the human
+handoff template:
+
+```bash
+npx create-lexmount-app --template human-in-the-loop --language typescript
+```
+
+This creates `lexmount-human-in-the-loop/`, pauses one Session at a controlled
+checkpoint, prints its Remote View URL, waits for the person to click
+**批准并继续**, and then resumes automation in that same Session.
+
+To retrieve files created inside a remote browser Session, generate the
+downloads template:
+
+```bash
+npx create-lexmount-app --template download-files --language typescript
+```
+
+This creates `lexmount-download-files/`, runs a controlled CSV download in a
+downloads-enabled Session, retrieves the file and ZIP through the Downloads
+API, verifies their metadata, and writes an auditable JSON manifest locally.
+
 During browser authorization, the CLI prints progress when the loopback
 callback arrives and when credential exchange finishes. The callback response
 closes its localhost connection explicitly, so a browser keep-alive connection
@@ -56,6 +138,13 @@ cannot delay dependency installation.
 | Template | Language | Description |
 | --- | --- | --- |
 | `screenshot` | `typescript` | Navigate to a URL and capture a full-page screenshot. |
+| `webpage-to-json` | `typescript` | Extract structured JSON from a public webpage with WebFetch. |
+| `search-results-to-json` | `typescript` | Search a page and save the first N results as structured JSON. |
+| `web-check` | `typescript` | Run a JSON web checklist and keep a persistent Recording for replay. |
+| `persistent-login-state` | `typescript` | Reuse Cookie and Local Storage state across separate browser Sessions. |
+| `parallel-browser-sessions` | `typescript` | Process a URL batch in isolated Sessions with bounded concurrency. |
+| `human-in-the-loop` | `typescript` | Pause for human approval and resume automation in the same Session. |
+| `download-files` | `typescript` | Download remote browser files locally with a manifest and ZIP archive. |
 
 ## CLI options
 

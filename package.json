@@ -1,7 +1,7 @@
 {
   "name": "create-lexmount-app",
   "version": "0.1.4",
-  "description": "Scaffold runnable Lexmount browser automation templates",
+  "description": "Scaffold runnable Lexmount Browser and WebFetch templates",
   "type": "module",
   "bin": {
     "create-lexmount-app": "bin/create-lexmount-app.js"
@@ -12,7 +12,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node --test",
+    "test": "node --test tests/cli.test.js",
     "test:release": "python3 -B -m unittest discover -s tests -p 'test_publish_npm.py'",
     "check": "node --check bin/create-lexmount-app.js && node --check bin/auth.js && npm test",
     "prepack": "npm run check",
@@ -22,6 +22,7 @@
   "keywords": [
     "lexmount",
     "browser-automation",
+    "webfetch",
     "playwright",
     "scaffold"
   ],
