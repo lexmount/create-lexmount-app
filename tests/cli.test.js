@@ -349,6 +349,55 @@ test('generates the persistent-login-state TypeScript template', () => {
   });
 });
 
+test('generates the parallel-browser-sessions TypeScript template', () => {
+  withTemporaryDirectory((cwd) => {
+    const result = runCli(
+      cwd,
+      [
+        '--template',
+        'parallel-browser-sessions',
+        '--language',
+        'typescript',
+        '--no-install',
+      ],
+      testCredentials(cwd)
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    const destination = path.join(cwd, 'lexmount-parallel-browser-sessions');
+    const generatedPackage = JSON.parse(
+      readFileSync(path.join(destination, 'package.json'), 'utf8')
+    );
+    assert.equal(generatedPackage.name, 'lexmount-parallel-browser-sessions');
+    assert.equal(generatedPackage.scripts.browse, 'tsx src/index.ts');
+    assert.equal(generatedPackage.dependencies.lexmount, '^0.5.15');
+    assert.equal(generatedPackage.dependencies.playwright, '^1.52.0');
+
+    const generatedInput = JSON.parse(
+      readFileSync(path.join(destination, 'inputs', 'urls.json'), 'utf8')
+    );
+    assert.equal(generatedInput.urls.length, 3);
+
+    const generatedSource = readFileSync(
+      path.join(destination, 'src', 'index.ts'),
+      'utf8'
+    );
+    assert.match(generatedSource, /allSettledWithConcurrency/);
+    assert.match(generatedSource, /client\.sessions\.create/);
+    assert.match(generatedSource, /client\.sessions\.delete/);
+    assert.match(generatedSource, /successful_results|aggregateResults/);
+
+    const generatedEnv = readFileSync(path.join(destination, '.env'), 'utf8');
+    assert.match(generatedEnv, /^LEXMOUNT_PROJECT_ID=project_test$/m);
+    assert.match(generatedEnv, /^LEXMOUNT_API_KEY=sk_test_not_a_real_secret$/m);
+    assert.match(
+      readFileSync(path.join(destination, '.gitignore'), 'utf8'),
+      /^artifacts\/$/m
+    );
+    assert.doesNotMatch(result.stdout, /sk_test_not_a_real_secret/);
+  });
+});
+
 test('supports a custom destination and renders a valid package name', () => {
   withTemporaryDirectory((cwd) => {
     const result = runCli(cwd, [
@@ -396,7 +445,7 @@ test('rejects an unknown template name', () => {
     assert.match(result.stderr, /Unsupported template: unknown-template/);
     assert.match(
       result.stderr,
-      /Supported templates: screenshot, webpage-to-json, search-results-to-json, web-check, persistent-login-state/
+      /Supported templates: screenshot, webpage-to-json, search-results-to-json, web-check, persistent-login-state, parallel-browser-sessions/
     );
   });
 });
@@ -564,6 +613,30 @@ test('installs and immediately runs the generated persistent login state example
   });
 });
 
+test('installs and immediately runs the generated parallel browser sessions example', () => {
+  withTemporaryDirectory((cwd) => {
+    const { binDirectory, logPath } = createFakeNpm(cwd);
+
+    const result = runCli(
+      cwd,
+      ['--template', 'parallel-browser-sessions', '--language', 'typescript'],
+      testCredentials(cwd, {
+        FAKE_NPM_LOG: logPath,
+        PATH: `${binDirectory}${path.delimiter}${process.env.PATH ?? ''}`,
+        npm_config_user_agent: 'npm/10.0.0 node/v22.0.0',
+      })
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(readFileSync(logPath, 'utf8').trim().split(/\r?\n/), [
+      'install',
+      'run browse --',
+    ]);
+    assert.match(result.stdout, /Running parallel browser sessions example/);
+    assert.doesNotMatch(result.stderr, /DEP0190/);
+  });
+});
+
 test('prints help and version without requiring template flags', () => {
   const help = runCli(repositoryRoot, ['--help']);
   assert.equal(help.status, 0, help.stderr);
@@ -572,6 +645,7 @@ test('prints help and version without requiring template flags', () => {
   assert.match(help.stdout, /search-results-to-json/);
   assert.match(help.stdout, /web-check/);
   assert.match(help.stdout, /persistent-login-state/);
+  assert.match(help.stdout, /parallel-browser-sessions/);
 
   const version = runCli(repositoryRoot, ['--version']);
   assert.equal(version.status, 0, version.stderr);

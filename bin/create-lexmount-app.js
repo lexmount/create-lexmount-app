@@ -130,6 +130,27 @@ const templateDefinitions = new Map([
       ]),
     },
   ],
+  [
+    'parallel-browser-sessions',
+    {
+      description: 'Process a URL batch in isolated browser Sessions with bounded concurrency.',
+      credentialSource: 'browser-cli',
+      connectIntent: 'scaffold-browser-example',
+      connectScopes: ['browser:sessions', 'browser:actions'],
+      languages: new Map([
+        [
+          'typescript',
+          {
+            run: {
+              label: 'parallel browser sessions example',
+              script: 'browse',
+              args: [],
+            },
+          },
+        ],
+      ]),
+    },
+  ],
 ]);
 const supportedTemplateNames = [...templateDefinitions.keys()].join(', ');
 const supportedLanguages = [
@@ -161,6 +182,7 @@ Examples:
   npx create-lexmount-app --template search-results-to-json --language typescript
   npx create-lexmount-app --template web-check --language typescript
   npx create-lexmount-app --template persistent-login-state --language typescript
+  npx create-lexmount-app --template parallel-browser-sessions --language typescript
 `;
 
 function readOptionValue(argv, index, optionName) {

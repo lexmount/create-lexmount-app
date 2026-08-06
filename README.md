@@ -95,6 +95,17 @@ Local Storage markers in one Session, verifies them in a second Session, and
 keeps the Context available for later tasks. Run `npm run cleanup` when you no
 longer need that demo Context.
 
+To process several public pages at the same time without sharing browser state,
+generate the parallel Sessions template:
+
+```bash
+npx create-lexmount-app --template parallel-browser-sessions --language typescript
+```
+
+This creates `lexmount-parallel-browser-sessions/`, distributes the URLs in
+`inputs/urls.json` across isolated Sessions with bounded concurrency, and saves
+successful results, failures, and Session lifecycle counts as JSON.
+
 During browser authorization, the CLI prints progress when the loopback
 callback arrives and when credential exchange finishes. The callback response
 closes its localhost connection explicitly, so a browser keep-alive connection
@@ -109,6 +120,7 @@ cannot delay dependency installation.
 | `search-results-to-json` | `typescript` | Search a page and save the first N results as structured JSON. |
 | `web-check` | `typescript` | Run a JSON web checklist and keep a persistent Recording for replay. |
 | `persistent-login-state` | `typescript` | Reuse Cookie and Local Storage state across separate browser Sessions. |
+| `parallel-browser-sessions` | `typescript` | Process a URL batch in isolated Sessions with bounded concurrency. |
 
 ## CLI options
 
