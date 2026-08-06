@@ -1,0 +1,40 @@
+{
+  "name": "selenium-web-form-check",
+  "url": "https://www.selenium.dev/selenium/web/web-form.html",
+  "checks": [
+    {
+      "action": "goto"
+    },
+    {
+      "action": "expectTitle",
+      "value": "Web form",
+      "match": "equals"
+    },
+    {
+      "action": "expectText",
+      "selector": "h1",
+      "value": "Web form",
+      "match": "equals"
+    },
+    {
+      "action": "fill",
+      "selector": "[name=\"my-text\"]",
+      "value": "Lexmount Recording check"
+    },
+    {
+      "action": "click",
+      "selector": "button"
+    },
+    {
+      "action": "expectUrl",
+      "value": "submitted-form.html",
+      "match": "contains"
+    },
+    {
+      "action": "expectText",
+      "selector": "#message",
+      "value": "Received!",
+      "match": "equals"
+    }
+  ]
+}

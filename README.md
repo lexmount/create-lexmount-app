@@ -72,6 +72,17 @@ for the results page, and saves the first three title/link/summary records to
 `artifacts/search-results.json`. Edit `config/baidu.json` to target another
 site or replace its role, label, text, CSS, and wait rules.
 
+For a repeatable browser check with a replayable Recording, generate the web
+check template:
+
+```bash
+npx create-lexmount-app --template web-check --language typescript
+```
+
+This creates `lexmount-web-check/`, runs the JSON checklist in
+`inputs/checks.json`, saves a machine-readable report to `artifacts/`, and
+closes the Session after preserving its persistent Recording for Replay.
+
 During browser authorization, the CLI prints progress when the loopback
 callback arrives and when credential exchange finishes. The callback response
 closes its localhost connection explicitly, so a browser keep-alive connection
@@ -84,6 +95,7 @@ cannot delay dependency installation.
 | `screenshot` | `typescript` | Navigate to a URL and capture a full-page screenshot. |
 | `webpage-to-json` | `typescript` | Extract structured JSON from a public webpage with WebFetch. |
 | `search-results-to-json` | `typescript` | Search a page and save the first N results as structured JSON. |
+| `web-check` | `typescript` | Run a JSON web checklist and keep a persistent Recording for replay. |
 
 ## CLI options
 

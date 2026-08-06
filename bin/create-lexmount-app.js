@@ -88,6 +88,27 @@ const templateDefinitions = new Map([
       ]),
     },
   ],
+  [
+    'web-check',
+    {
+      description: 'Run a JSON web checklist and keep a persistent Recording for replay.',
+      credentialSource: 'browser-cli',
+      connectIntent: 'scaffold-browser-example',
+      connectScopes: ['browser:sessions', 'browser:actions'],
+      languages: new Map([
+        [
+          'typescript',
+          {
+            run: {
+              label: 'recorded web check example',
+              script: 'check:web',
+              args: [],
+            },
+          },
+        ],
+      ]),
+    },
+  ],
 ]);
 const supportedTemplateNames = [...templateDefinitions.keys()].join(', ');
 const supportedLanguages = [
@@ -117,6 +138,7 @@ Examples:
   npx create-lexmount-app my-screenshot --template screenshot --language typescript
   npx create-lexmount-app --template webpage-to-json --language typescript
   npx create-lexmount-app --template search-results-to-json --language typescript
+  npx create-lexmount-app --template web-check --language typescript
 `;
 
 function readOptionValue(argv, index, optionName) {
