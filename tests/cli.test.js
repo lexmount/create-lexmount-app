@@ -398,6 +398,47 @@ test('generates the parallel-browser-sessions TypeScript template', () => {
   });
 });
 
+test('generates the human-in-the-loop TypeScript template', () => {
+  withTemporaryDirectory((cwd) => {
+    const result = runCli(
+      cwd,
+      ['--template', 'human-in-the-loop', '--language', 'typescript', '--no-install'],
+      testCredentials(cwd)
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    const destination = path.join(cwd, 'lexmount-human-in-the-loop');
+    const generatedPackage = JSON.parse(
+      readFileSync(path.join(destination, 'package.json'), 'utf8')
+    );
+    assert.equal(generatedPackage.name, 'lexmount-human-in-the-loop');
+    assert.equal(generatedPackage.scripts.handoff, 'tsx src/index.ts');
+    assert.equal(generatedPackage.dependencies.lexmount, '^0.5.15');
+    assert.equal(generatedPackage.dependencies.playwright, '^1.52.0');
+
+    const generatedSource = readFileSync(
+      path.join(destination, 'src', 'index.ts'),
+      'utf8'
+    );
+    assert.match(generatedSource, /Remote View:/);
+    assert.match(generatedSource, /waitForHumanApproval/);
+    assert.match(generatedSource, /session_preserved_during_handoff/);
+    assert.match(generatedSource, /session\.close/);
+
+    const generatedPage = readFileSync(
+      path.join(destination, 'src', 'handoff.ts'),
+      'utf8'
+    );
+    assert.match(generatedPage, /批准并继续/);
+    assert.match(generatedPage, /body\[data-handoff-state="approved"\]/);
+
+    const generatedEnv = readFileSync(path.join(destination, '.env'), 'utf8');
+    assert.match(generatedEnv, /^LEXMOUNT_PROJECT_ID=project_test$/m);
+    assert.match(generatedEnv, /^LEXMOUNT_API_KEY=sk_test_not_a_real_secret$/m);
+    assert.doesNotMatch(result.stdout, /sk_test_not_a_real_secret/);
+  });
+});
+
 test('supports a custom destination and renders a valid package name', () => {
   withTemporaryDirectory((cwd) => {
     const result = runCli(cwd, [
@@ -445,7 +486,7 @@ test('rejects an unknown template name', () => {
     assert.match(result.stderr, /Unsupported template: unknown-template/);
     assert.match(
       result.stderr,
-      /Supported templates: screenshot, webpage-to-json, search-results-to-json, web-check, persistent-login-state, parallel-browser-sessions/
+      /Supported templates: screenshot, webpage-to-json, search-results-to-json, web-check, persistent-login-state, parallel-browser-sessions, human-in-the-loop/
     );
   });
 });
@@ -637,6 +678,30 @@ test('installs and immediately runs the generated parallel browser sessions exam
   });
 });
 
+test('installs and immediately runs the generated human handoff example', () => {
+  withTemporaryDirectory((cwd) => {
+    const { binDirectory, logPath } = createFakeNpm(cwd);
+
+    const result = runCli(
+      cwd,
+      ['--template', 'human-in-the-loop', '--language', 'typescript'],
+      testCredentials(cwd, {
+        FAKE_NPM_LOG: logPath,
+        PATH: `${binDirectory}${path.delimiter}${process.env.PATH ?? ''}`,
+        npm_config_user_agent: 'npm/10.0.0 node/v22.0.0',
+      })
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(readFileSync(logPath, 'utf8').trim().split(/\r?\n/), [
+      'install',
+      'run handoff --',
+    ]);
+    assert.match(result.stdout, /Running human handoff example/);
+    assert.doesNotMatch(result.stderr, /DEP0190/);
+  });
+});
+
 test('prints help and version without requiring template flags', () => {
   const help = runCli(repositoryRoot, ['--help']);
   assert.equal(help.status, 0, help.stderr);
@@ -646,6 +711,7 @@ test('prints help and version without requiring template flags', () => {
   assert.match(help.stdout, /web-check/);
   assert.match(help.stdout, /persistent-login-state/);
   assert.match(help.stdout, /parallel-browser-sessions/);
+  assert.match(help.stdout, /human-in-the-loop/);
 
   const version = runCli(repositoryRoot, ['--version']);
   assert.equal(version.status, 0, version.stderr);

@@ -151,6 +151,27 @@ const templateDefinitions = new Map([
       ]),
     },
   ],
+  [
+    'human-in-the-loop',
+    {
+      description: 'Pause for human approval and resume automation in the same Session.',
+      credentialSource: 'browser-cli',
+      connectIntent: 'scaffold-browser-example',
+      connectScopes: ['browser:sessions', 'browser:actions'],
+      languages: new Map([
+        [
+          'typescript',
+          {
+            run: {
+              label: 'human handoff example',
+              script: 'handoff',
+              args: [],
+            },
+          },
+        ],
+      ]),
+    },
+  ],
 ]);
 const supportedTemplateNames = [...templateDefinitions.keys()].join(', ');
 const supportedLanguages = [
@@ -183,6 +204,7 @@ Examples:
   npx create-lexmount-app --template web-check --language typescript
   npx create-lexmount-app --template persistent-login-state --language typescript
   npx create-lexmount-app --template parallel-browser-sessions --language typescript
+  npx create-lexmount-app --template human-in-the-loop --language typescript
 `;
 
 function readOptionValue(argv, index, optionName) {

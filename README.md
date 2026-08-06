@@ -106,6 +106,17 @@ This creates `lexmount-parallel-browser-sessions/`, distributes the URLs in
 `inputs/urls.json` across isolated Sessions with bounded concurrency, and saves
 successful results, failures, and Session lifecycle counts as JSON.
 
+For a workflow that must pause until a person approves it, generate the human
+handoff template:
+
+```bash
+npx create-lexmount-app --template human-in-the-loop --language typescript
+```
+
+This creates `lexmount-human-in-the-loop/`, pauses one Session at a controlled
+checkpoint, prints its Remote View URL, waits for the person to click
+**批准并继续**, and then resumes automation in that same Session.
+
 During browser authorization, the CLI prints progress when the loopback
 callback arrives and when credential exchange finishes. The callback response
 closes its localhost connection explicitly, so a browser keep-alive connection
@@ -121,6 +132,7 @@ cannot delay dependency installation.
 | `web-check` | `typescript` | Run a JSON web checklist and keep a persistent Recording for replay. |
 | `persistent-login-state` | `typescript` | Reuse Cookie and Local Storage state across separate browser Sessions. |
 | `parallel-browser-sessions` | `typescript` | Process a URL batch in isolated Sessions with bounded concurrency. |
+| `human-in-the-loop` | `typescript` | Pause for human approval and resume automation in the same Session. |
 
 ## CLI options
 
