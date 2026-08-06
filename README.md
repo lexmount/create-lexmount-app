@@ -59,6 +59,19 @@ This creates `lexmount-webpage-to-json/`, sends one WebFetch request for
 text, links, images, and related metadata. It does not create a Browser Session
 or install Playwright.
 
+For a page that must be searched interactively, generate the browser search
+template:
+
+```bash
+npx create-lexmount-app --template search-results-to-json --language typescript
+```
+
+This creates `lexmount-search-results-to-json/`, opens Baidu in a temporary
+Lexmount Browser Session, fills and submits a search through Playwright, waits
+for the results page, and saves the first three title/link/summary records to
+`artifacts/search-results.json`. Edit `config/baidu.json` to target another
+site or replace its role, label, text, CSS, and wait rules.
+
 During browser authorization, the CLI prints progress when the loopback
 callback arrives and when credential exchange finishes. The callback response
 closes its localhost connection explicitly, so a browser keep-alive connection
@@ -70,6 +83,7 @@ cannot delay dependency installation.
 | --- | --- | --- |
 | `screenshot` | `typescript` | Navigate to a URL and capture a full-page screenshot. |
 | `webpage-to-json` | `typescript` | Extract structured JSON from a public webpage with WebFetch. |
+| `search-results-to-json` | `typescript` | Search a page and save the first N results as structured JSON. |
 
 ## CLI options
 

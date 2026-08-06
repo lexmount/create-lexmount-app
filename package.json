@@ -12,7 +12,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node --test",
+    "test": "node --test tests/cli.test.js",
     "test:release": "python3 -B -m unittest discover -s tests -p 'test_publish_npm.py'",
     "check": "node --check bin/create-lexmount-app.js && node --check bin/auth.js && npm test",
     "prepack": "npm run check",

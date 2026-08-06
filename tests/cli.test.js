@@ -205,6 +205,60 @@ test('generates the WebFetch webpage-to-json TypeScript template', () => {
   });
 });
 
+test('generates the search-results-to-json TypeScript template', () => {
+  withTemporaryDirectory((cwd) => {
+    const result = runCli(
+      cwd,
+      [
+        '--template',
+        'search-results-to-json',
+        '--language',
+        'typescript',
+        '--no-install',
+      ],
+      testCredentials(cwd)
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    const destination = path.join(cwd, 'lexmount-search-results-to-json');
+    const generatedPackage = JSON.parse(
+      readFileSync(path.join(destination, 'package.json'), 'utf8')
+    );
+    assert.equal(generatedPackage.name, 'lexmount-search-results-to-json');
+    assert.equal(generatedPackage.scripts.search, 'tsx src/index.ts');
+    assert.equal(generatedPackage.scripts.test, 'tsx --test tests/config.test.ts');
+    assert.equal(generatedPackage.dependencies.lexmount, '^0.5.15');
+    assert.equal(generatedPackage.dependencies.playwright, '^1.52.0');
+    assert.equal(generatedPackage.allowScripts.esbuild, true);
+
+    const generatedConfig = JSON.parse(
+      readFileSync(path.join(destination, 'config', 'baidu.json'), 'utf8')
+    );
+    assert.equal(generatedConfig.search.input.by, 'role');
+    assert.equal(generatedConfig.search.submit.role, 'button');
+    assert.equal(generatedConfig.results.item.by, 'css');
+
+    const generatedSource = readFileSync(
+      path.join(destination, 'src', 'index.ts'),
+      'utf8'
+    );
+    assert.match(generatedSource, /client\.sessions\.create/);
+    assert.match(generatedSource, /chromium\.connectOverCDP/);
+    assert.match(generatedSource, /session\?\.close/);
+    assert.match(generatedSource, /session_id/);
+    assert.match(generatedSource, /elapsed_ms/);
+
+    const generatedEnv = readFileSync(path.join(destination, '.env'), 'utf8');
+    assert.match(generatedEnv, /^LEXMOUNT_PROJECT_ID=project_test$/m);
+    assert.match(generatedEnv, /^LEXMOUNT_API_KEY=sk_test_not_a_real_secret$/m);
+    assert.match(
+      readFileSync(path.join(destination, '.gitignore'), 'utf8'),
+      /^artifacts\/$/m
+    );
+    assert.doesNotMatch(result.stdout, /sk_test_not_a_real_secret/);
+  });
+});
+
 test('supports a custom destination and renders a valid package name', () => {
   withTemporaryDirectory((cwd) => {
     const result = runCli(cwd, [
@@ -252,7 +306,7 @@ test('rejects the retired web-check template name', () => {
     assert.match(result.stderr, /Unsupported template: web-check/);
     assert.match(
       result.stderr,
-      /Supported templates: screenshot, webpage-to-json/
+      /Supported templates: screenshot, webpage-to-json, search-results-to-json/
     );
   });
 });
@@ -346,11 +400,38 @@ test('installs and immediately runs the generated WebFetch example', () => {
   });
 });
 
+test('installs and immediately runs the generated search results example', () => {
+  withTemporaryDirectory((cwd) => {
+    const { binDirectory, logPath } = createFakeNpm(cwd);
+
+    const result = runCli(
+      cwd,
+      ['--template', 'search-results-to-json', '--language', 'typescript'],
+      testCredentials(cwd, {
+        FAKE_NPM_LOG: logPath,
+        PATH: `${binDirectory}${path.delimiter}${process.env.PATH ?? ''}`,
+        npm_config_user_agent: 'npm/10.0.0 node/v22.0.0',
+      })
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    const commands = readFileSync(logPath, 'utf8').trim().split(/\r?\n/);
+    assert.equal(commands[0], 'install');
+    assert.match(
+      commands[1],
+      /^run search -- --query "?Lexmount browser"? --limit 3$/
+    );
+    assert.match(result.stdout, /Running search results extraction example/);
+    assert.doesNotMatch(result.stderr, /DEP0190/);
+  });
+});
+
 test('prints help and version without requiring template flags', () => {
   const help = runCli(repositoryRoot, ['--help']);
   assert.equal(help.status, 0, help.stderr);
   assert.match(help.stdout, /--template <name>/);
   assert.match(help.stdout, /webpage-to-json/);
+  assert.match(help.stdout, /search-results-to-json/);
 
   const version = runCli(repositoryRoot, ['--version']);
   assert.equal(version.status, 0, version.stderr);

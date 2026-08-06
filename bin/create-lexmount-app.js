@@ -67,6 +67,27 @@ const templateDefinitions = new Map([
       ]),
     },
   ],
+  [
+    'search-results-to-json',
+    {
+      description: 'Search a page and save the first N results as structured JSON.',
+      credentialSource: 'browser-cli',
+      connectIntent: 'scaffold-browser-example',
+      connectScopes: ['browser:sessions', 'browser:actions'],
+      languages: new Map([
+        [
+          'typescript',
+          {
+            run: {
+              label: 'search results extraction example',
+              script: 'search',
+              args: ['--query', 'Lexmount browser', '--limit', '3'],
+            },
+          },
+        ],
+      ]),
+    },
+  ],
 ]);
 const supportedTemplateNames = [...templateDefinitions.keys()].join(', ');
 const supportedLanguages = [
@@ -95,6 +116,7 @@ Examples:
   npx create-lexmount-app --template screenshot --language typescript
   npx create-lexmount-app my-screenshot --template screenshot --language typescript
   npx create-lexmount-app --template webpage-to-json --language typescript
+  npx create-lexmount-app --template search-results-to-json --language typescript
 `;
 
 function readOptionValue(argv, index, optionName) {
