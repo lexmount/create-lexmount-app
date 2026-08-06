@@ -83,6 +83,18 @@ This creates `lexmount-web-check/`, runs the JSON checklist in
 `inputs/checks.json`, saves a machine-readable report to `artifacts/`, and
 closes the Session after preserving its persistent Recording for Replay.
 
+To prove that login state can survive across separate browser Sessions,
+generate the persistent Context template:
+
+```bash
+npx create-lexmount-app --template persistent-login-state --language typescript
+```
+
+This creates `lexmount-persistent-login-state/`, writes safe demo Cookie and
+Local Storage markers in one Session, verifies them in a second Session, and
+keeps the Context available for later tasks. Run `npm run cleanup` when you no
+longer need that demo Context.
+
 During browser authorization, the CLI prints progress when the loopback
 callback arrives and when credential exchange finishes. The callback response
 closes its localhost connection explicitly, so a browser keep-alive connection
@@ -96,6 +108,7 @@ cannot delay dependency installation.
 | `webpage-to-json` | `typescript` | Extract structured JSON from a public webpage with WebFetch. |
 | `search-results-to-json` | `typescript` | Search a page and save the first N results as structured JSON. |
 | `web-check` | `typescript` | Run a JSON web checklist and keep a persistent Recording for replay. |
+| `persistent-login-state` | `typescript` | Reuse Cookie and Local Storage state across separate browser Sessions. |
 
 ## CLI options
 

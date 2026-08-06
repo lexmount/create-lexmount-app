@@ -109,6 +109,27 @@ const templateDefinitions = new Map([
       ]),
     },
   ],
+  [
+    'persistent-login-state',
+    {
+      description: 'Reuse Cookie and Local Storage state across separate browser Sessions.',
+      credentialSource: 'browser-cli',
+      connectIntent: 'scaffold-browser-example',
+      connectScopes: ['browser:sessions', 'browser:actions'],
+      languages: new Map([
+        [
+          'typescript',
+          {
+            run: {
+              label: 'persistent login state example',
+              script: 'demo',
+              args: ['--url', DEFAULT_EXAMPLE_URL],
+            },
+          },
+        ],
+      ]),
+    },
+  ],
 ]);
 const supportedTemplateNames = [...templateDefinitions.keys()].join(', ');
 const supportedLanguages = [
@@ -139,6 +160,7 @@ Examples:
   npx create-lexmount-app --template webpage-to-json --language typescript
   npx create-lexmount-app --template search-results-to-json --language typescript
   npx create-lexmount-app --template web-check --language typescript
+  npx create-lexmount-app --template persistent-login-state --language typescript
 `;
 
 function readOptionValue(argv, index, optionName) {
