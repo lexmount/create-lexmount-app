@@ -54,9 +54,9 @@ async function main(): Promise<void> {
   }
 
   const report = createReport(plan, path.relative(process.cwd(), inputPath));
-  const region = process.env.LEXMOUNT_REGION?.trim() || 'nanjing-1';
-  report.session.region = region;
-  const client = new Lexmount({ region });
+  const region = process.env.LEXMOUNT_REGION?.trim();
+  report.session.region = region || null;
+  const client = new Lexmount(region ? { region } : {});
   let session: SessionInfo | undefined;
   let browser: Browser | undefined;
 
@@ -66,6 +66,7 @@ async function main(): Promise<void> {
       recording: { persistent: true },
     });
     report.session.id = session.id;
+    report.session.region = session.regionId || region || null;
     report.session.inspect_url = session.inspectUrl;
     report.session.replay_console_url = replayConsoleUrl(session.id);
     report.session.closure.status = 'pending';

@@ -18,14 +18,14 @@ Copy-Item .env.example .env
 ```dotenv
 LEXMOUNT_API_KEY=your_api_key_here
 LEXMOUNT_PROJECT_ID=your_project_id_here
-LEXMOUNT_REGION=nanjing-1
+# LEXMOUNT_REGION=your_catalog_region_id
 ```
 
 `LEXMOUNT_BASE_URL` defaults to `https://api.lexmount.cn`. The Replay link uses
 `LEXMOUNT_HOME_URL`, which defaults to `https://browser.lexmount.cn`.
-`LEXMOUNT_REGION` defaults to `nanjing-1`, the currently verified region for
-persistent Recording and Replay. Only override it with another region after
-confirming that region stores Replay data.
+Leave `LEXMOUNT_REGION` unset to let the SDK and API automatically select an
+available region. Set it only to a region ID from the current API catalog after
+confirming that region stores persistent Recording and Replay data.
 
 ## Define checks
 

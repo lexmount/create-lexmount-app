@@ -291,10 +291,29 @@ test('generates the web-check TypeScript template', () => {
     assert.match(generatedSource, /recording: \{ persistent: true \}/);
     assert.match(generatedSource, /chromium\.connectOverCDP/);
     assert.match(generatedSource, /persistEvidenceAndClose/);
+    assert.match(
+      generatedSource,
+      /const region = process\.env\.LEXMOUNT_REGION\?\.trim\(\);/
+    );
+    assert.match(generatedSource, /report\.session\.region = region \|\| null;/);
+    assert.match(
+      generatedSource,
+      /new Lexmount\(region \? \{ region \} : \{\}\)/
+    );
+    assert.match(
+      generatedSource,
+      /report\.session\.region = session\.regionId \|\| region \|\| null;/
+    );
+    assert.doesNotMatch(generatedSource, /nanjing-1/);
 
     const generatedEnv = readFileSync(path.join(destination, '.env'), 'utf8');
     assert.match(generatedEnv, /^LEXMOUNT_PROJECT_ID=project_test$/m);
     assert.match(generatedEnv, /^LEXMOUNT_API_KEY=sk_test_not_a_real_secret$/m);
+    assert.match(
+      generatedEnv,
+      /^# LEXMOUNT_REGION=your_catalog_region_id$/m
+    );
+    assert.doesNotMatch(generatedEnv, /^LEXMOUNT_REGION=/m);
     assert.match(
       readFileSync(path.join(destination, '.gitignore'), 'utf8'),
       /^artifacts\/\*\.json$/m
