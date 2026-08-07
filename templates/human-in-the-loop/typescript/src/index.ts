@@ -1,14 +1,17 @@
 import { parseArgs } from 'node:util';
 import { config } from 'dotenv';
 import { Lexmount, type SessionInfo } from 'lexmount';
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
+import { chromium, type Browser, type Page } from 'playwright';
 import {
-  APPROVAL_SELECTOR,
   assertTimelineOrder,
-  buildDemoPage,
   durationBetween,
-  parseApprovalTimestamp,
+  GITEE_LOGIN_FORM_SELECTOR,
+  isSuccessPageReady,
+  isSuccessUrl,
   resolveHandoffSettings,
+  safeUrlPath,
+  SUCCESS_STABILITY_MS,
+  type HandoffSettings,
   type HandoffTimeline,
 } from './handoff.js';
 
@@ -18,18 +21,16 @@ config({ override: false });
 type SessionPage = {
   session: SessionInfo;
   browser: Browser;
-  context: BrowserContext;
   page: Page;
 };
 
 type HandoffResult = {
   template: 'human-in-the-loop';
   session_id: string;
-  inspect_url: string;
   session_preserved_during_handoff: true;
   human_action: {
-    control: '批准并继续';
-    detected_by: typeof APPROVAL_SELECTOR;
+    control: 'Complete login in Remote View';
+    detected_by: 'stable success URL with login form absent';
   };
   timeline: HandoffTimeline;
   durations_ms: {
@@ -38,7 +39,8 @@ type HandoffResult = {
     total: number;
   };
   result: {
-    approved: true;
+    authenticated: true;
+    final_path: string;
     remaining_task_completed: true;
   };
 };
@@ -54,13 +56,17 @@ async function main(): Promise<void> {
     options: {
       'timeout-seconds': { type: 'string' },
       'poll-interval-ms': { type: 'string' },
+      url: { type: 'string' },
+      'success-url': { type: 'string' },
     },
     strict: true,
     allowPositionals: false,
   });
   const settings = resolveHandoffSettings(
     values['timeout-seconds'] ?? process.env.HANDOFF_TIMEOUT_SECONDS,
-    values['poll-interval-ms'] ?? process.env.POLL_INTERVAL_MS
+    values['poll-interval-ms'] ?? process.env.POLL_INTERVAL_MS,
+    values.url ?? process.env.TARGET_URL,
+    values['success-url'] ?? process.env.SUCCESS_URL
   );
   const region = process.env.LEXMOUNT_REGION?.trim();
   const client = new Lexmount(region ? { region } : {});
@@ -68,8 +74,7 @@ async function main(): Promise<void> {
   try {
     const result = await runHandoffDemo(
       client,
-      settings.timeout_seconds * 1_000,
-      settings.poll_interval_ms
+      settings
     );
     console.log(JSON.stringify(result, null, 2));
   } finally {
@@ -79,45 +84,43 @@ async function main(): Promise<void> {
 
 async function runHandoffDemo(
   client: Lexmount,
-  timeoutMs: number,
-  pollIntervalMs: number
+  settings: HandoffSettings
 ): Promise<HandoffResult> {
   const sessionCreatedAt = new Date().toISOString();
   const sessionPage = await createSessionPage(client);
+  const timeoutMs = settings.timeout_seconds * 1_000;
 
   try {
-    await sessionPage.page.setContent(buildDemoPage(), {
+    await sessionPage.page.goto(settings.target_url, {
       waitUntil: 'domcontentloaded',
-      timeout: 30_000,
+      timeout: 60_000,
     });
     const pausedAt = new Date().toISOString();
 
     console.error('');
     console.error(`[paused ${pausedAt}] Human action is required.`);
     console.error(`Remote View: ${sessionPage.session.inspectUrl}`);
-    console.error('Open the Remote View and click “批准并继续”.');
     console.error(
-      `The same Session will wait up to ${Math.round(timeoutMs / 1_000)} seconds and then resume automatically.`
+      `Open the Remote View and complete the login. Expected destination: ${safeUrlPath(settings.success_url)}.`
+    );
+    console.error('Enter credentials only in Remote View; never put them in .env or command arguments.');
+    console.error(
+      `The same Session will wait up to ${settings.timeout_seconds} seconds and then resume automatically.`
     );
     console.error('');
 
-    const humanCompletedAt = await waitForHumanApproval(
+    const handoff = await waitForHumanCompletion(
       sessionPage.page,
+      settings.success_url,
       timeoutMs,
-      pollIntervalMs
+      settings.poll_interval_ms
     );
+    const humanCompletedAt = handoff.completed_at;
     const resumedAt = new Date().toISOString();
-    console.error(`[resumed ${resumedAt}] Approval detected; continuing automation.`);
+    console.error(`[resumed ${resumedAt}] Login detected; continuing automation.`);
 
-    await sessionPage.page.locator('#handoff-status').evaluate((element) => {
-      element.textContent = '批准已确认，自动化正在执行剩余步骤';
-    });
-    await sessionPage.page.waitForTimeout(500);
-    await sessionPage.page.locator('#handoff-status').evaluate((element) => {
-      element.textContent = '全部自动化步骤已完成';
-    });
     const completedAt = new Date().toISOString();
-    console.error(`[completed ${completedAt}] Remaining automation finished.`);
+    console.error(`[completed ${completedAt}] Authenticated page verification finished.`);
 
     const timeline: HandoffTimeline = {
       session_created_at: sessionCreatedAt,
@@ -131,11 +134,10 @@ async function runHandoffDemo(
     return {
       template: 'human-in-the-loop',
       session_id: sessionPage.session.id,
-      inspect_url: sessionPage.session.inspectUrl,
       session_preserved_during_handoff: true,
       human_action: {
-        control: '批准并继续',
-        detected_by: APPROVAL_SELECTOR,
+        control: 'Complete login in Remote View',
+        detected_by: 'stable success URL with login form absent',
       },
       timeline,
       durations_ms: {
@@ -144,7 +146,8 @@ async function runHandoffDemo(
         total: durationBetween(sessionCreatedAt, completedAt),
       },
       result: {
-        approved: true,
+        authenticated: true,
+        final_path: handoff.final_path,
         remaining_task_completed: true,
       },
     };
@@ -155,30 +158,68 @@ async function runHandoffDemo(
 
 async function createSessionPage(client: Lexmount): Promise<SessionPage> {
   const session = await client.sessions.create({ browserMode: 'normal' });
-  let browser: Browser;
+  let browser: Browser | undefined;
   try {
     browser = await chromium.connectOverCDP(session.connectUrl);
+    const context = browser.contexts()[0] ?? (await browser.newContext());
+    const page = context.pages()[0] ?? (await context.newPage());
+    return { session, browser, page };
   } catch (error) {
-    await session.close();
+    const cleanupErrors = await closeResources(session, browser);
+    if (cleanupErrors.length > 0) {
+      throw new AggregateError(
+        [error, ...cleanupErrors],
+        `Session ${session.id} initialization and cleanup both failed.`
+      );
+    }
     throw error;
   }
-  const context = browser.contexts()[0] ?? (await browser.newContext());
-  const page = context.pages()[0] ?? (await context.newPage());
-  return { session, browser, context, page };
 }
 
-async function waitForHumanApproval(
+async function waitForHumanCompletion(
   page: Page,
+  successUrl: string,
   timeoutMs: number,
   pollIntervalMs: number
-): Promise<string> {
+): Promise<{ completed_at: string; final_path: string }> {
   const deadline = Date.now() + timeoutMs;
-  const approvalMarker = page.locator(APPROVAL_SELECTOR);
+  let lastUrl = page.url();
 
   while (Date.now() < deadline) {
-    if ((await approvalMarker.count()) > 0) {
-      parseApprovalTimestamp(await approvalMarker.getAttribute('data-approved-at'));
-      return new Date().toISOString();
+    lastUrl = page.url();
+    if (isSuccessUrl(lastUrl, successUrl)) {
+      const remainingForLoadMs = deadline - Date.now();
+      if (remainingForLoadMs <= 0) break;
+      const loaded = await page
+        .waitForLoadState('domcontentloaded', { timeout: remainingForLoadMs })
+        .then(() => true, () => false);
+      if (!loaded) continue;
+
+      const remainingForFormMs = deadline - Date.now();
+      if (remainingForFormMs <= 0) break;
+      const loginFormGone = await page
+        .locator(GITEE_LOGIN_FORM_SELECTOR)
+        .first()
+        .waitFor({
+          state: 'detached',
+          timeout: Math.min(5_000, remainingForFormMs),
+        })
+        .then(() => true, () => false);
+      if (!loginFormGone) continue;
+
+      const remainingForStabilityMs = deadline - Date.now();
+      if (remainingForStabilityMs < SUCCESS_STABILITY_MS) break;
+      await page.waitForTimeout(SUCCESS_STABILITY_MS);
+      lastUrl = page.url();
+      const loginFormControlCount = await page
+        .locator(GITEE_LOGIN_FORM_SELECTOR)
+        .count();
+      if (isSuccessPageReady(lastUrl, successUrl, loginFormControlCount)) {
+        return {
+          completed_at: new Date().toISOString(),
+          final_path: safeUrlPath(lastUrl),
+        };
+      }
     }
     const remainingMs = deadline - Date.now();
     if (remainingMs <= 0) break;
@@ -186,15 +227,36 @@ async function waitForHumanApproval(
   }
 
   throw new Error(
-    `Timed out after ${Math.round(timeoutMs / 1_000)} seconds waiting for “批准并继续”.`
+    `Timed out after ${Math.round(timeoutMs / 1_000)} seconds waiting for login. Last page: ${safeUrlPath(lastUrl)}.`
   );
 }
 
 async function closeSessionPage(sessionPage: SessionPage): Promise<void> {
-  await sessionPage.browser.close().catch((error: unknown) => {
-    console.error(`Browser cleanup warning: ${String(error)}`);
-  });
-  await sessionPage.session.close().catch((error: unknown) => {
-    console.error(`Session cleanup warning: ${String(error)}`);
-  });
+  const errors = await closeResources(sessionPage.session, sessionPage.browser);
+  if (errors.length > 0) {
+    throw new AggregateError(
+      errors,
+      `Failed to fully close Session ${sessionPage.session.id}.`
+    );
+  }
+}
+
+async function closeResources(
+  session: SessionInfo,
+  browser: Browser | undefined
+): Promise<unknown[]> {
+  const errors: unknown[] = [];
+  if (browser) {
+    try {
+      await browser.close();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  try {
+    await session.close();
+  } catch (error) {
+    errors.push(error);
+  }
+  return errors;
 }

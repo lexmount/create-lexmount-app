@@ -4,7 +4,7 @@ import { config } from 'dotenv';
 config({ override: false });
 
 const DEFAULT_API_BASE_URL = 'https://api.lexmount.cn';
-const DEFAULT_TARGET_URL = 'https://example.com';
+const DEFAULT_TARGET_URL = 'https://cn.vuejs.org/guide/introduction';
 const REQUEST_TIMEOUT_MS = 60_000;
 
 type JsonObject = Record<string, unknown>;

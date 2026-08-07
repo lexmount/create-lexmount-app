@@ -2,16 +2,18 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import path from 'node:path';
 import {
+  CONTROLLED_DEMO_LOCATOR,
   DEFAULT_DOWNLOAD_LOCATOR,
   DEFAULT_DOWNLOAD_POLL_INTERVAL_MS,
   DEFAULT_DOWNLOAD_TIMEOUT_MS,
+  DEFAULT_TARGET_URL,
   resolveDownloadSettings,
 } from '../src/config.js';
 
 describe('resolveDownloadSettings', () => {
-  it('uses the controlled demo defaults', () => {
+  it('uses the real-world download defaults', () => {
     const settings = resolveDownloadSettings({}, 'C:\\demo');
-    assert.equal(settings.targetUrl, null);
+    assert.equal(settings.targetUrl, DEFAULT_TARGET_URL);
     assert.equal(settings.downloadLocator, DEFAULT_DOWNLOAD_LOCATOR);
     assert.equal(settings.timeoutMs, DEFAULT_DOWNLOAD_TIMEOUT_MS);
     assert.equal(settings.pollIntervalMs, DEFAULT_DOWNLOAD_POLL_INTERVAL_MS);
@@ -40,9 +42,10 @@ describe('resolveDownloadSettings', () => {
     const settings = resolveDownloadSettings({
       controlledDemo: true,
       targetUrl: 'https://example.com/reports',
+      downloadLocator: DEFAULT_DOWNLOAD_LOCATOR,
     });
     assert.equal(settings.targetUrl, null);
-    assert.equal(settings.downloadLocator, DEFAULT_DOWNLOAD_LOCATOR);
+    assert.equal(settings.downloadLocator, CONTROLLED_DEMO_LOCATOR);
   });
 
   it('rejects non-http target URLs', () => {

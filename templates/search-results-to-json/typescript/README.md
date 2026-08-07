@@ -18,7 +18,7 @@ Leave `LEXMOUNT_REGION` unset unless you need a specific catalog region.
 ## Run the default Baidu example
 
 ```bash
-npm run search -- --query "Lexmount browser" --limit 5
+npm run search -- --query "Playwright 浏览器自动化" --limit 3
 ```
 
 The command writes `artifacts/search-results.json` and prints the same JSON. It

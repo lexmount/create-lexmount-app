@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  assertPersistedState,
-  DEMO_COOKIE_VALUE,
-  DEMO_STORAGE_VALUE,
+  assertExpectedDashboardUrl,
+  DEFAULT_LOGIN_TIMEOUT_SECONDS,
+  isExpectedDashboardUrl,
+  LOGIN_ACCOUNT_SELECTOR,
+  LOGIN_PASSWORD_SELECTOR,
+  LOGIN_SUBMIT_SELECTOR,
   parseStoredContextState,
+  resolveLoginTimeoutSeconds,
   validateTargetUrl,
 } from '../src/state.js';
 
@@ -12,8 +16,8 @@ const validState = {
   schema_version: 1,
   created_by: 'persistent-login-state',
   context_id: 'ctx_test',
-  target_url: 'https://example.com/',
-  origin: 'https://example.com',
+  target_url: 'https://tdesign.tencent.com/starter/vue-next/dashboard/base',
+  origin: 'https://tdesign.tencent.com',
   created_at: '2026-08-06T00:00:00.000Z',
 };
 
@@ -42,18 +46,45 @@ test('parseStoredContextState rejects mismatched ownership and origins', () => {
   );
 });
 
-test('assertPersistedState accepts both expected browser-state markers', () => {
-  assert.doesNotThrow(() =>
-    assertPersistedState({
-      cookie: DEMO_COOKIE_VALUE,
-      local_storage: DEMO_STORAGE_VALUE,
-    })
+test('login controls use form-scoped selectors that do not depend on locale or demo values', () => {
+  assert.equal(LOGIN_ACCOUNT_SELECTOR, 'form.login-password input[type="text"]');
+  assert.equal(LOGIN_PASSWORD_SELECTOR, 'form.login-password input[type="password"]');
+  assert.equal(LOGIN_SUBMIT_SELECTOR, 'form.login-password button[type="submit"]');
+  assert.doesNotMatch(
+    `${LOGIN_ACCOUNT_SELECTOR} ${LOGIN_PASSWORD_SELECTOR} ${LOGIN_SUBMIT_SELECTOR}`,
+    /admin|请输入|登录/
   );
 });
 
-test('assertPersistedState reports missing cookie and local storage together', () => {
+test('resolveLoginTimeoutSeconds supplies and validates the supported range', () => {
+  assert.equal(resolveLoginTimeoutSeconds(undefined), DEFAULT_LOGIN_TIMEOUT_SECONDS);
+  assert.equal(resolveLoginTimeoutSeconds('120'), 120);
+  assert.throws(() => resolveLoginTimeoutSeconds('9'), /between 10 and 300/);
+  assert.throws(() => resolveLoginTimeoutSeconds('1.5'), /whole number/);
+});
+
+test('dashboard matching requires the expected origin and exact path', () => {
+  assert.equal(
+    isExpectedDashboardUrl(validState.target_url, validState.origin),
+    true
+  );
+  assert.equal(
+    isExpectedDashboardUrl(
+      'https://tdesign.tencent.com/starter/vue-next/login',
+      validState.origin
+    ),
+    false
+  );
+  assert.equal(
+    isExpectedDashboardUrl(validState.target_url, 'https://example.com'),
+    false
+  );
   assert.throws(
-    () => assertPersistedState({ cookie: null, local_storage: null }),
-    /cookie .*localStorage/
+    () =>
+      assertExpectedDashboardUrl(
+        'https://tdesign.tencent.com/starter/vue-next/login',
+        validState.origin
+      ),
+    /Expected the TDesign dashboard/
   );
 });

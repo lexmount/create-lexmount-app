@@ -16,8 +16,12 @@ base URL to this project's ignored `.env` file. If you generated with
 ## Extract a webpage
 
 ```bash
-npm run extract -- --url https://example.com
+npm run extract -- --url https://cn.vuejs.org/guide/introduction
 ```
+
+The default target is Vue's public Chinese introduction guide. Its headings,
+main text, links, and metadata make the structured WebFetch result immediately
+useful while keeping the example credential-free.
 
 You may instead set `TARGET_URL` in `.env` and run `npm run extract` without a
 flag.

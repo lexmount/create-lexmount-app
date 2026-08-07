@@ -1,18 +1,19 @@
 import { parseArgs } from 'node:util';
 import { config } from 'dotenv';
 import { Lexmount, type SessionInfo } from 'lexmount';
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
+import { chromium, type Browser, type Page } from 'playwright';
 import {
-  assertPersistedState,
-  DEMO_COOKIE_NAME,
-  DEMO_COOKIE_TTL_SECONDS,
-  DEMO_COOKIE_VALUE,
-  DEMO_STORAGE_KEY,
-  DEMO_STORAGE_VALUE,
+  assertExpectedDashboardUrl,
+  DEFAULT_LOGIN_URL,
+  isExpectedDashboardUrl,
+  LOGIN_ACCOUNT_SELECTOR,
+  LOGIN_PASSWORD_SELECTOR,
+  LOGIN_SUBMIT_SELECTOR,
+  LOGIN_SUCCESS_SELECTOR,
+  resolveLoginTimeoutSeconds,
   STATE_CREATED_BY,
   STATE_SCHEMA_VERSION,
   validateTargetUrl,
-  type PersistedStateObservation,
   type StoredContextState,
 } from './state.js';
 import {
@@ -34,8 +35,8 @@ type SetupResult = {
   session_id: string;
   target_url: string;
   state_file: string;
-  cookie_established: true;
-  local_storage_established: true;
+  login_completed: true;
+  dashboard_visible: true;
 };
 
 type VerifyResult = {
@@ -44,15 +45,14 @@ type VerifyResult = {
   session_id: string;
   target_url: string;
   context_mode: 'readWrite';
-  cookie_persisted: boolean;
-  local_storage_persisted: boolean;
+  login_state_reused: true;
+  dashboard_visible: true;
   verified: true;
 };
 
 type SessionPage = {
   session: SessionInfo;
   browser: Browser;
-  context: BrowserContext;
   page: Page;
 };
 
@@ -82,13 +82,31 @@ async function main(): Promise<void> {
   const client = new Lexmount(region ? { region } : {});
   try {
     if (command === 'setup') {
+      const loginTimeoutMs =
+        resolveLoginTimeoutSeconds(process.env.LOGIN_TIMEOUT_SECONDS) * 1_000;
       console.log(
-        JSON.stringify(await setupPersistentState(client, stateFile, targetUrl), null, 2)
+        JSON.stringify(
+          await setupPersistentState(
+            client,
+            stateFile,
+            targetUrl,
+            loginTimeoutMs
+          ),
+          null,
+          2
+        )
       );
     } else if (command === 'verify') {
       console.log(JSON.stringify(await verifyPersistentState(client, stateFile), null, 2));
     } else if (command === 'demo') {
-      const setup = await setupPersistentState(client, stateFile, targetUrl);
+      const loginTimeoutMs =
+        resolveLoginTimeoutSeconds(process.env.LOGIN_TIMEOUT_SECONDS) * 1_000;
+      const setup = await setupPersistentState(
+        client,
+        stateFile,
+        targetUrl,
+        loginTimeoutMs
+      );
       const verify = await verifyPersistentState(client, stateFile);
       console.log(JSON.stringify({ command: 'demo', setup, verify }, null, 2));
     } else {
@@ -110,12 +128,11 @@ function parseCommand(value: string | undefined): Command {
 async function setupPersistentState(
   client: Lexmount,
   targetStateFile: string,
-  targetUrl: string | undefined
+  targetUrl: string | undefined,
+  loginTimeoutMs: number
 ): Promise<SetupResult> {
   await assertStateFileMissing(targetStateFile);
-  const requestedUrl = validateTargetUrl(
-    targetUrl ?? 'https://example.com'
-  );
+  const requestedUrl = validateTargetUrl(targetUrl ?? DEFAULT_LOGIN_URL);
   const persistentContext = await client.contexts.create({
     description: 'Persistent login state TypeScript template',
     metadata: {
@@ -127,20 +144,22 @@ async function setupPersistentState(
   let stateWritten = false;
   try {
     const sessionPage = await createSessionPage(client, persistentContext.id, 'readWrite');
+    let sessionClosed = false;
     const { session } = sessionPage;
     try {
       await sessionPage.page.goto(requestedUrl.toString(), {
         waitUntil: 'domcontentloaded',
         timeout: 60_000,
       });
-      const finalUrl = validateTargetUrl(sessionPage.page.url());
-      await establishDemoState(sessionPage.context, sessionPage.page, finalUrl.origin);
-      const observation = await observeDemoState(
-        sessionPage.context,
+      await loginToTDesign(
         sessionPage.page,
-        finalUrl.origin
+        requestedUrl.origin,
+        loginTimeoutMs
       );
-      assertPersistedState(observation);
+      const finalUrl = assertExpectedDashboardUrl(
+        sessionPage.page.url(),
+        requestedUrl.origin
+      );
 
       const storedState: StoredContextState = {
         schema_version: STATE_SCHEMA_VERSION,
@@ -151,6 +170,7 @@ async function setupPersistentState(
         created_at: new Date().toISOString(),
       };
       await closeSessionPage(sessionPage);
+      sessionClosed = true;
       await waitForContextAvailable(client, persistentContext.id);
       await writeContextState(targetStateFile, storedState);
       stateWritten = true;
@@ -161,11 +181,13 @@ async function setupPersistentState(
         session_id: session.id,
         target_url: storedState.target_url,
         state_file: targetStateFile,
-        cookie_established: true,
-        local_storage_established: true,
+        login_completed: true,
+        dashboard_visible: true,
       };
     } finally {
-      await closeSessionPage(sessionPage);
+      if (!sessionClosed) {
+        await closeSessionPage(sessionPage);
+      }
     }
   } finally {
     if (!stateWritten) {
@@ -194,27 +216,25 @@ async function verifyPersistentState(
       waitUntil: 'domcontentloaded',
       timeout: 60_000,
     });
-    const finalUrl = validateTargetUrl(sessionPage.page.url());
+    await assertDashboardVisible(sessionPage.page, storedState.origin, 60_000);
+    const finalUrl = assertExpectedDashboardUrl(
+      sessionPage.page.url(),
+      storedState.origin
+    );
     if (finalUrl.origin !== storedState.origin) {
       throw new Error(
         `Target origin changed from ${storedState.origin} to ${finalUrl.origin}; browser state is origin-scoped.`
       );
     }
 
-    const observation = await observeDemoState(
-      sessionPage.context,
-      sessionPage.page,
-      storedState.origin
-    );
-    assertPersistedState(observation);
     return {
       command: 'verify',
       context_id: storedState.context_id,
       session_id: sessionPage.session.id,
       target_url: finalUrl.toString(),
       context_mode: 'readWrite',
-      cookie_persisted: observation.cookie === DEMO_COOKIE_VALUE,
-      local_storage_persisted: observation.local_storage === DEMO_STORAGE_VALUE,
+      login_state_reused: true,
+      dashboard_visible: true,
       verified: true,
     };
   } finally {
@@ -259,67 +279,102 @@ async function createSessionPage(
     browserMode: 'normal',
     context: { id: contextId, mode },
   });
-  console.log(`${mode} session inspect URL: ${session.inspectUrl}`);
-  if (session.contextId !== contextId) {
-    await session.close();
-    throw new Error(
-      `Session ${session.id} mounted context ${String(session.contextId)} instead of ${contextId}.`
-    );
-  }
-
-  let browser: Browser;
+  let browser: Browser | undefined;
   try {
+    if (session.contextId !== contextId) {
+      throw new Error(
+        `Session ${session.id} mounted context ${String(session.contextId)} instead of ${contextId}.`
+      );
+    }
     browser = await chromium.connectOverCDP(session.connectUrl);
+    const context = browser.contexts()[0] ?? (await browser.newContext());
+    const page = context.pages()[0] ?? (await context.newPage());
+    return { session, browser, page };
   } catch (error) {
-    await session.close();
+    const cleanupErrors = await closeResources(session, browser);
+    if (cleanupErrors.length > 0) {
+      throw new AggregateError(
+        [error, ...cleanupErrors],
+        `Session ${session.id} initialization and cleanup both failed.`
+      );
+    }
     throw error;
   }
-  const context = browser.contexts()[0] ?? (await browser.newContext());
-  const page = context.pages()[0] ?? (await context.newPage());
-  return { session, browser, context, page };
 }
 
 async function closeSessionPage(sessionPage: SessionPage): Promise<void> {
-  await sessionPage.browser.close().catch(() => undefined);
-  await sessionPage.session.close();
+  const errors = await closeResources(sessionPage.session, sessionPage.browser);
+  if (errors.length > 0) {
+    throw new AggregateError(
+      errors,
+      `Failed to fully close Session ${sessionPage.session.id}.`
+    );
+  }
 }
 
-async function establishDemoState(
-  context: BrowserContext,
+async function loginToTDesign(
   page: Page,
-  origin: string
+  expectedOrigin: string,
+  timeoutMs: number
 ): Promise<void> {
-  await context.addCookies([
-    {
-      name: DEMO_COOKIE_NAME,
-      value: DEMO_COOKIE_VALUE,
-      url: origin,
-      sameSite: 'Lax',
-      secure: origin.startsWith('https:'),
-      expires: Math.floor(Date.now() / 1_000) + DEMO_COOKIE_TTL_SECONDS,
-    },
-  ]);
-  await page.evaluate(
-    ({ key, value }) => localStorage.setItem(key, value),
-    { key: DEMO_STORAGE_KEY, value: DEMO_STORAGE_VALUE }
+  const accountField = page.locator(LOGIN_ACCOUNT_SELECTOR);
+  const passwordField = page.locator(LOGIN_PASSWORD_SELECTOR);
+  await accountField.waitFor({ state: 'visible', timeout: timeoutMs });
+  await passwordField.waitFor({ state: 'visible', timeout: timeoutMs });
+
+  if (!(await accountField.inputValue()).trim() || !(await passwordField.inputValue())) {
+    throw new Error(
+      'The public TDesign demo fields are no longer prefilled. This template intentionally does not accept account credentials; update the demo contract before continuing.'
+    );
+  }
+
+  await page.locator(LOGIN_SUBMIT_SELECTOR).click({
+    timeout: timeoutMs,
+  });
+  await page.waitForURL(
+    (url) => isExpectedDashboardUrl(url, expectedOrigin),
+    { timeout: timeoutMs }
   );
+  await assertDashboardVisible(page, expectedOrigin, timeoutMs);
 }
 
-async function observeDemoState(
-  context: BrowserContext,
+async function assertDashboardVisible(
   page: Page,
-  origin: string
-): Promise<PersistedStateObservation> {
-  const cookies = await context.cookies(origin);
-  const cookie = cookies.find((candidate) => candidate.name === DEMO_COOKIE_NAME);
-  const localStorageValue = await page.evaluate(
-    (key) => localStorage.getItem(key),
-    DEMO_STORAGE_KEY
-  );
-  return {
-    cookie: cookie?.value ?? null,
-    local_storage: localStorageValue,
-  };
+  expectedOrigin: string,
+  timeoutMs: number
+): Promise<void> {
+  try {
+    await page.locator(LOGIN_SUCCESS_SELECTOR).first().waitFor({
+      state: 'visible',
+      timeout: timeoutMs,
+    });
+  } catch {
+    const currentUrl = validateTargetUrl(page.url());
+    throw new Error(
+      `TDesign login state was not available at ${currentUrl.origin}${currentUrl.pathname}.`
+    );
+  }
+  assertExpectedDashboardUrl(page.url(), expectedOrigin);
+}
+
+async function closeResources(
+  session: SessionInfo,
+  browser: Browser | undefined
+): Promise<unknown[]> {
+  const errors: unknown[] = [];
+  if (browser) {
+    try {
+      await browser.close();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  try {
+    await session.close();
+  } catch (error) {
+    errors.push(error);
+  }
+  return errors;
 }
 
 async function waitForContextAvailable(

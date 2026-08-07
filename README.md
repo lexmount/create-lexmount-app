@@ -11,7 +11,8 @@ npx create-lexmount-app --template screenshot --language typescript
 
 The command creates `lexmount-screenshot/`, configures local Lexmount
 credentials, installs dependencies, and immediately runs the generated
-screenshot example against `https://example.com`. Credential setup uses this
+full-page screenshot example against Semi Design's public Button documentation.
+Credential setup uses this
 order:
 
 1. current `LEXMOUNT_API_KEY` + `LEXMOUNT_PROJECT_ID` environment variables;
@@ -34,7 +35,7 @@ To run it again with another URL:
 
 ```bash
 cd lexmount-screenshot
-npm run screenshot -- --url https://example.com
+npm run screenshot -- --url https://semi.design/zh-CN/basic/button
 ```
 
 Leave `LEXMOUNT_REGION` unset to let the SDK and API automatically select an
@@ -54,10 +55,10 @@ template instead:
 npx create-lexmount-app --template webpage-to-json --language typescript
 ```
 
-This creates `lexmount-webpage-to-json/`, sends one WebFetch request for
-`https://example.com`, and prints structured JSON containing the title, main
-text, links, images, and related metadata. It does not create a Browser Session
-or install Playwright.
+This creates `lexmount-webpage-to-json/`, sends one WebFetch request for Vue's
+public Chinese introduction guide, and prints structured JSON containing the
+title, main text, links, images, and related metadata. It does not create a
+Browser Session or install Playwright.
 
 For a page that must be searched interactively, generate the browser search
 template:
@@ -67,10 +68,11 @@ npx create-lexmount-app --template search-results-to-json --language typescript
 ```
 
 This creates `lexmount-search-results-to-json/`, opens Baidu in a temporary
-Lexmount Browser Session, fills and submits a search through Playwright, waits
-for the results page, and saves the first three title/link/summary records to
-`artifacts/search-results.json`. Edit `config/baidu.json` to target another
-site or replace its role, label, text, CSS, and wait rules.
+Lexmount Browser Session, searches for `Playwright 浏览器自动化` through
+Playwright, waits for the results page, and saves the first three
+title/link/summary records to `artifacts/search-results.json`. Edit
+`config/baidu.json` to target another site or replace its role, label, text,
+CSS, and wait rules.
 
 For a repeatable browser check with a replayable Recording, generate the web
 check template:
@@ -79,9 +81,10 @@ check template:
 npx create-lexmount-app --template web-check --language typescript
 ```
 
-This creates `lexmount-web-check/`, runs the JSON checklist in
-`inputs/checks.json`, saves a machine-readable report to `artifacts/`, and
-closes the Session after preserving its persistent Recording for Replay.
+This creates `lexmount-web-check/`, verifies Lexmount's production homepage,
+follows its public **开发文档** link, saves a machine-readable report to
+`artifacts/`, and closes the Session after preserving its persistent Recording
+for Replay.
 
 To prove that login state can survive across separate browser Sessions,
 generate the persistent Context template:
@@ -90,10 +93,10 @@ generate the persistent Context template:
 npx create-lexmount-app --template persistent-login-state --language typescript
 ```
 
-This creates `lexmount-persistent-login-state/`, writes safe demo Cookie and
-Local Storage markers in one Session, verifies them in a second Session, and
-keeps the Context available for later tasks. Run `npm run cleanup` when you no
-longer need that demo Context.
+This creates `lexmount-persistent-login-state/`, signs in to the public TDesign
+Starter demo in one Session, verifies the dashboard remains logged in from a
+second Session, and keeps the Context available for later tasks. Run
+`npm run cleanup` when you no longer need that demo Context.
 
 To process several public pages at the same time without sharing browser state,
 generate the parallel Sessions template:
@@ -102,9 +105,10 @@ generate the parallel Sessions template:
 npx create-lexmount-app --template parallel-browser-sessions --language typescript
 ```
 
-This creates `lexmount-parallel-browser-sessions/`, distributes the URLs in
-`inputs/urls.json` across isolated Sessions with bounded concurrency, and saves
-successful results, failures, and Session lifecycle counts as JSON.
+This creates `lexmount-parallel-browser-sessions/`, checks the Alibaba Cloud,
+Tencent Cloud, and Baidu AI Cloud public health dashboards in isolated Sessions
+with bounded concurrency, and saves reachability, metadata, timing, failures,
+and Session lifecycle counts as JSON.
 
 For a workflow that must pause until a person approves it, generate the human
 handoff template:
@@ -113,9 +117,11 @@ handoff template:
 npx create-lexmount-app --template human-in-the-loop --language typescript
 ```
 
-This creates `lexmount-human-in-the-loop/`, pauses one Session at a controlled
-checkpoint, prints its Remote View URL, waits for the person to click
-**批准并继续**, and then resumes automation in that same Session.
+This creates `lexmount-human-in-the-loop/` and prints the manual command instead
+of starting it automatically. When run, it opens Gitee login, pauses one
+Session, prints its Remote View URL, waits for a person to complete login, and
+then resumes automation in that same Session. Credentials are entered only in
+Remote View and never stored by the template.
 
 To retrieve files created inside a remote browser Session, generate the
 downloads template:
@@ -124,9 +130,11 @@ downloads template:
 npx create-lexmount-app --template download-files --language typescript
 ```
 
-This creates `lexmount-download-files/`, runs a controlled CSV download in a
-downloads-enabled Session, retrieves the file and ZIP through the Downloads
-API, verifies their metadata, and writes an auditable JSON manifest locally.
+This creates `lexmount-download-files/`, downloads a small Node.js headers
+archive from Tsinghua University's public mirror in a downloads-enabled
+Session, retrieves the file and ZIP through the Downloads API, verifies their
+metadata, and writes an auditable JSON manifest locally. `--demo` remains
+available as a controlled built-in fallback without a third-party file host.
 
 During browser authorization, the CLI prints progress when the loopback
 callback arrives and when credential exchange finishes. The callback response
@@ -141,9 +149,9 @@ cannot delay dependency installation.
 | `webpage-to-json` | `typescript` | Extract structured JSON from a public webpage with WebFetch. |
 | `search-results-to-json` | `typescript` | Search a page and save the first N results as structured JSON. |
 | `web-check` | `typescript` | Run a JSON web checklist and keep a persistent Recording for replay. |
-| `persistent-login-state` | `typescript` | Reuse Cookie and Local Storage state across separate browser Sessions. |
+| `persistent-login-state` | `typescript` | Reuse a real demo site's login state across separate browser Sessions. |
 | `parallel-browser-sessions` | `typescript` | Process a URL batch in isolated Sessions with bounded concurrency. |
-| `human-in-the-loop` | `typescript` | Pause for human approval and resume automation in the same Session. |
+| `human-in-the-loop` | `typescript` | Pause for a human login and resume automation in the same Session. |
 | `download-files` | `typescript` | Download remote browser files locally with a manifest and ZIP archive. |
 
 ## CLI options

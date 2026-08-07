@@ -24,24 +24,25 @@ and set `LEXMOUNT_API_KEY` and `LEXMOUNT_PROJECT_ID`.
 
 Never commit `.env`; it is ignored by Git.
 
-## Run the controlled demo
+## Run the real-world download
 
 ```bash
 npm install
 npm run download
 ```
 
-The default page and CSV link are generated inside the remote Session. The demo
-does not depend on an external file server, so it is suitable for a repeatable
-Downloads API smoke test.
+The default target is Tsinghua University's public Node.js release mirror. The
+remote browser opens the fixed `v24.1.0` directory and downloads the small
+`node-v24.1.0-headers.tar.xz` archive before retrieving it through the Lexmount
+Downloads API.
 
-Use `npm run download -- --demo` to force the controlled demo when `.env`
-already contains a `TARGET_URL` for a real task.
+Use `npm run download -- --demo` to run the built-in CSV fallback without any
+third-party network dependency.
 
 Each run creates a timestamped directory under `artifacts/downloads` containing:
 
 ```text
-files/lexmount-downloads-demo.csv
+files/node-v24.1.0-headers.tar.xz
 downloads.zip
 download-manifest.json
 ```
@@ -55,8 +56,8 @@ metadata.
 Set the page URL and a Playwright locator that matches the download control:
 
 ```dotenv
-TARGET_URL=https://example.com/reports
-DOWNLOAD_LOCATOR=a[download]
+TARGET_URL=https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/v24.1.0/
+DOWNLOAD_LOCATOR=a[href="node-v24.1.0-headers.tar.xz"]
 ```
 
 Then run `npm run download`. The first visible matching element is clicked.
@@ -68,8 +69,8 @@ Command-line flags override environment values:
 
 ```bash
 npm run download -- \
-  --url https://example.com/reports \
-  --locator "a[download]" \
+  --url https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/v24.1.0/ \
+  --locator 'a[href="node-v24.1.0-headers.tar.xz"]' \
   --output artifacts/downloads \
   --timeout-ms 90000 \
   --poll-interval-ms 1000

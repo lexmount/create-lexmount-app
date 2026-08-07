@@ -1,8 +1,8 @@
 {
   "name": "baidu",
   "start_url": "https://www.baidu.com/",
-  "default_query": "Lexmount browser",
-  "default_limit": 5,
+  "default_query": "Playwright 浏览器自动化",
+  "default_limit": 3,
   "timeout_ms": 60000,
   "search": {
     "input": {

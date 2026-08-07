@@ -3,4 +3,4 @@ LEXMOUNT_PROJECT_ID=your_project_id_here
 LEXMOUNT_BASE_URL=https://api.lexmount.cn
 
 # Optional default. The CLI flag takes precedence.
-TARGET_URL=https://example.com
+TARGET_URL=https://cn.vuejs.org/guide/introduction

@@ -1,10 +1,15 @@
 export const STATE_SCHEMA_VERSION = 1 as const;
 export const STATE_CREATED_BY = 'persistent-login-state' as const;
-export const DEMO_COOKIE_NAME = 'lexmount_demo_session';
-export const DEMO_COOKIE_VALUE = 'authenticated';
-export const DEMO_COOKIE_TTL_SECONDS = 24 * 60 * 60;
-export const DEMO_STORAGE_KEY = 'lexmount.demo.authenticated';
-export const DEMO_STORAGE_VALUE = 'true';
+
+export const DEFAULT_LOGIN_URL =
+  'https://tdesign.tencent.com/starter/vue-next/login';
+export const LOGIN_FORM_SELECTOR = 'form.login-password';
+export const LOGIN_ACCOUNT_SELECTOR = `${LOGIN_FORM_SELECTOR} input[type="text"]`;
+export const LOGIN_PASSWORD_SELECTOR = `${LOGIN_FORM_SELECTOR} input[type="password"]`;
+export const LOGIN_SUBMIT_SELECTOR = `${LOGIN_FORM_SELECTOR} button[type="submit"]`;
+export const LOGIN_SUCCESS_PATHNAME = '/starter/vue-next/dashboard/base';
+export const LOGIN_SUCCESS_SELECTOR = '.dashboard-item';
+export const DEFAULT_LOGIN_TIMEOUT_SECONDS = 60;
 
 export type StoredContextState = {
   schema_version: typeof STATE_SCHEMA_VERSION;
@@ -15,11 +20,6 @@ export type StoredContextState = {
   created_at: string;
 };
 
-export type PersistedStateObservation = {
-  cookie: string | null;
-  local_storage: string | null;
-};
-
 export function validateTargetUrl(value: string): URL {
   const url = new URL(value);
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
@@ -27,6 +27,40 @@ export function validateTargetUrl(value: string): URL {
   }
   if (url.username || url.password) {
     throw new Error('Target URL must not contain credentials.');
+  }
+  return url;
+}
+
+export function resolveLoginTimeoutSeconds(value: string | undefined): number {
+  if (value === undefined) return DEFAULT_LOGIN_TIMEOUT_SECONDS;
+  const normalized = value.trim();
+  if (!/^\d+$/.test(normalized)) {
+    throw new Error('LOGIN_TIMEOUT_SECONDS must be a whole number.');
+  }
+  const parsed = Number(normalized);
+  if (!Number.isSafeInteger(parsed) || parsed < 10 || parsed > 300) {
+    throw new Error('LOGIN_TIMEOUT_SECONDS must be between 10 and 300.');
+  }
+  return parsed;
+}
+
+export function isExpectedDashboardUrl(
+  value: string | URL,
+  expectedOrigin: string
+): boolean {
+  const url = value instanceof URL ? value : validateTargetUrl(value);
+  return url.origin === expectedOrigin && url.pathname === LOGIN_SUCCESS_PATHNAME;
+}
+
+export function assertExpectedDashboardUrl(
+  value: string | URL,
+  expectedOrigin: string
+): URL {
+  const url = value instanceof URL ? value : validateTargetUrl(value);
+  if (!isExpectedDashboardUrl(url, expectedOrigin)) {
+    throw new Error(
+      `Expected the TDesign dashboard at ${expectedOrigin}${LOGIN_SUCCESS_PATHNAME}, received ${url.origin}${url.pathname}.`
+    );
   }
   return url;
 }
@@ -73,21 +107,4 @@ export function parseStoredContextState(value: unknown): StoredContextState {
     origin: originUrl.origin,
     created_at: candidate.created_at,
   };
-}
-
-export function assertPersistedState(observation: PersistedStateObservation): void {
-  const failures: string[] = [];
-  if (observation.cookie !== DEMO_COOKIE_VALUE) {
-    failures.push(
-      `cookie ${DEMO_COOKIE_NAME} expected ${JSON.stringify(DEMO_COOKIE_VALUE)}, got ${JSON.stringify(observation.cookie)}`
-    );
-  }
-  if (observation.local_storage !== DEMO_STORAGE_VALUE) {
-    failures.push(
-      `localStorage ${DEMO_STORAGE_KEY} expected ${JSON.stringify(DEMO_STORAGE_VALUE)}, got ${JSON.stringify(observation.local_storage)}`
-    );
-  }
-  if (failures.length > 0) {
-    throw new Error(`Persistent state verification failed: ${failures.join('; ')}`);
-  }
 }

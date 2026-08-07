@@ -33,42 +33,47 @@ Edit `inputs/checks.json`:
 
 ```json
 {
-  "name": "selenium-web-form-check",
-  "url": "https://www.selenium.dev/selenium/web/web-form.html",
-  "timeout_ms": 30000,
+  "name": "lexmount-docs-navigation-check",
+  "url": "https://lexmount.cn/",
+  "timeout_ms": 60000,
   "checks": [
     { "action": "goto" },
     {
       "action": "expectTitle",
-      "value": "Web form",
-      "match": "equals"
-    },
-    {
-      "action": "expectText",
-      "selector": "h1",
-      "value": "Web form",
-      "match": "equals"
-    },
-    {
-      "action": "fill",
-      "selector": "[name=\"my-text\"]",
-      "value": "Lexmount Recording check"
-    },
-    { "action": "click", "selector": "button" },
-    {
-      "action": "expectUrl",
-      "value": "submitted-form.html",
+      "value": "Lexmount",
       "match": "contains"
     },
     {
       "action": "expectText",
-      "selector": "#message",
-      "value": "Received!",
+      "selector": "h1",
+      "value": "企业级浏览能力",
+      "match": "contains"
+    },
+    { "action": "click", "selector": "a[href=\"https://browser.lexmount.cn/docs\"]" },
+    {
+      "action": "expectUrl",
+      "value": "https://browser.lexmount.cn/docs",
+      "match": "contains"
+    },
+    {
+      "action": "expectTitle",
+      "value": "文档总览",
+      "match": "contains"
+    },
+    {
+      "action": "expectText",
+      "selector": "h1",
+      "value": "文档总览",
       "match": "equals"
     }
   ]
 }
 ```
+
+The shipped checklist is a real production smoke test: it opens Lexmount's
+public homepage, verifies the hero, follows the **开发文档** link, and confirms
+the public documentation landing page. The persistent Recording makes the
+entire navigation available for Replay.
 
 The schema intentionally supports only these actions:
 
