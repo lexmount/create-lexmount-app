@@ -23,7 +23,13 @@ const packageMetadata = JSON.parse(
   readFileSync(path.join(packageRoot, 'package.json'), 'utf8')
 );
 
-const DEFAULT_EXAMPLE_URL = 'https://example.com';
+const DEFAULT_SCREENSHOT_URL = 'https://semi.design/zh-CN/basic/button';
+const DEFAULT_WEBFETCH_URL = 'https://cn.vuejs.org/guide/introduction';
+const DEFAULT_PERSISTENT_LOGIN_URL =
+  'https://tdesign.tencent.com/starter/vue-next/login';
+const DEFAULT_DOWNLOAD_URL =
+  'https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/v24.1.0/';
+const DEFAULT_DOWNLOAD_LOCATOR = 'a[href="node-v24.1.0-headers.tar.xz"]';
 const templateDefinitions = new Map([
   [
     'screenshot',
@@ -39,7 +45,7 @@ const templateDefinitions = new Map([
             run: {
               label: 'screenshot example',
               script: 'screenshot',
-              args: ['--url', DEFAULT_EXAMPLE_URL],
+              args: ['--url', DEFAULT_SCREENSHOT_URL],
             },
           },
         ],
@@ -60,7 +66,7 @@ const templateDefinitions = new Map([
             run: {
               label: 'WebFetch extraction example',
               script: 'extract',
-              args: ['--url', DEFAULT_EXAMPLE_URL],
+              args: ['--url', DEFAULT_WEBFETCH_URL],
             },
           },
         ],
@@ -81,7 +87,7 @@ const templateDefinitions = new Map([
             run: {
               label: 'search results extraction example',
               script: 'search',
-              args: ['--query', 'Lexmount browser', '--limit', '3'],
+              args: ['--query', 'Playwright 浏览器自动化', '--limit', '3'],
             },
           },
         ],
@@ -112,7 +118,7 @@ const templateDefinitions = new Map([
   [
     'persistent-login-state',
     {
-      description: 'Reuse Cookie and Local Storage state across separate browser Sessions.',
+      description: 'Log in once and reuse the authenticated Context across separate browser Sessions.',
       credentialSource: 'browser-cli',
       connectIntent: 'scaffold-browser-example',
       connectScopes: ['browser:sessions', 'browser:actions'],
@@ -123,7 +129,7 @@ const templateDefinitions = new Map([
             run: {
               label: 'persistent login state example',
               script: 'demo',
-              args: ['--url', DEFAULT_EXAMPLE_URL],
+              args: ['--url', DEFAULT_PERSISTENT_LOGIN_URL],
             },
           },
         ],
@@ -154,7 +160,7 @@ const templateDefinitions = new Map([
   [
     'human-in-the-loop',
     {
-      description: 'Pause for human approval and resume automation in the same Session.',
+      description: 'Pause for a human login and resume automation in the same Session.',
       credentialSource: 'browser-cli',
       connectIntent: 'scaffold-browser-example',
       connectScopes: ['browser:sessions', 'browser:actions'],
@@ -166,6 +172,7 @@ const templateDefinitions = new Map([
               label: 'human handoff example',
               script: 'handoff',
               args: [],
+              autoRun: false,
             },
           },
         ],
@@ -186,7 +193,12 @@ const templateDefinitions = new Map([
             run: {
               label: 'remote file download example',
               script: 'download',
-              args: ['--demo'],
+              args: [
+                '--url',
+                DEFAULT_DOWNLOAD_URL,
+                '--locator',
+                DEFAULT_DOWNLOAD_LOCATOR,
+              ],
             },
           },
         ],
@@ -475,7 +487,13 @@ function printManualRunInstructions(
   if (!installed) {
     console.log(`  ${packageManager} install`);
   }
-  console.log(`  ${runPrefix} ${run.script} -- ${run.args.join(' ')}`);
+  const formattedArgs = run.args.map(formatManualArgument).join(' ');
+  const scriptArgs = formattedArgs ? ` -- ${formattedArgs}` : '';
+  console.log(`  ${runPrefix} ${run.script}${scriptArgs}`);
+}
+
+function formatManualArgument(value) {
+  return /^[A-Za-z0-9_./:=@%+,-]+$/u.test(value) ? value : JSON.stringify(value);
 }
 
 async function main(argv) {
@@ -554,7 +572,11 @@ async function main(argv) {
     installDependencies(destination);
   }
   console.log(`\nCreated Lexmount app in ${destination}`);
-  if (options.install && credentials) {
+  if (
+    options.install &&
+    credentials &&
+    selection.languageDefinition.run.autoRun !== false
+  ) {
     runGeneratedExample(
       destination,
       packageManager,

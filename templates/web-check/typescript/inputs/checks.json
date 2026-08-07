@@ -1,39 +1,40 @@
 {
-  "name": "selenium-web-form-check",
-  "url": "https://www.selenium.dev/selenium/web/web-form.html",
+  "name": "lexmount-docs-navigation-check",
+  "url": "https://lexmount.cn/",
+  "timeout_ms": 60000,
   "checks": [
     {
       "action": "goto"
     },
     {
       "action": "expectTitle",
-      "value": "Web form",
-      "match": "equals"
-    },
-    {
-      "action": "expectText",
-      "selector": "h1",
-      "value": "Web form",
-      "match": "equals"
-    },
-    {
-      "action": "fill",
-      "selector": "[name=\"my-text\"]",
-      "value": "Lexmount Recording check"
-    },
-    {
-      "action": "click",
-      "selector": "button"
-    },
-    {
-      "action": "expectUrl",
-      "value": "submitted-form.html",
+      "value": "Lexmount",
       "match": "contains"
     },
     {
       "action": "expectText",
-      "selector": "#message",
-      "value": "Received!",
+      "selector": "h1",
+      "value": "企业级浏览能力",
+      "match": "contains"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"https://browser.lexmount.cn/docs\"]"
+    },
+    {
+      "action": "expectUrl",
+      "value": "https://browser.lexmount.cn/docs",
+      "match": "contains"
+    },
+    {
+      "action": "expectTitle",
+      "value": "文档总览",
+      "match": "contains"
+    },
+    {
+      "action": "expectText",
+      "selector": "h1",
+      "value": "文档总览",
       "match": "equals"
     }
   ]

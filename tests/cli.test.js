@@ -255,6 +255,10 @@ test('generates the search-results-to-json TypeScript template', () => {
       readFileSync(path.join(destination, '.gitignore'), 'utf8'),
       /^artifacts\/$/m
     );
+    assert.match(
+      result.stdout,
+      /npm run search -- --query "Playwright 浏览器自动化" --limit 3/
+    );
     assert.doesNotMatch(result.stdout, /sk_test_not_a_real_secret/);
   });
 });
@@ -282,7 +286,9 @@ test('generates the web-check TypeScript template', () => {
       readFileSync(path.join(destination, 'inputs', 'checks.json'), 'utf8')
     );
     assert.equal(generatedChecks.checks.length, 7);
-    assert.equal(generatedChecks.checks[3].action, 'fill');
+    assert.equal(generatedChecks.url, 'https://lexmount.cn/');
+    assert.equal(generatedChecks.checks[3].action, 'click');
+    assert.match(generatedChecks.checks[3].selector, /browser\.lexmount\.cn\/docs/);
 
     const generatedSource = readFileSync(
       path.join(destination, 'src', 'index.ts'),
@@ -353,8 +359,9 @@ test('generates the persistent-login-state TypeScript template', () => {
     );
     assert.match(generatedSource, /client\.contexts\.create/);
     assert.match(generatedSource, /context: \{ id: contextId, mode \}/);
-    assert.match(generatedSource, /cookie_persisted/);
-    assert.match(generatedSource, /local_storage_persisted/);
+    assert.match(generatedSource, /login_state_reused/);
+    assert.match(generatedSource, /LOGIN_SUCCESS_SELECTOR/);
+    assert.doesNotMatch(generatedSource, /DEMO_COOKIE|DEMO_STORAGE/);
     assert.match(generatedSource, /client\.contexts\.delete/);
 
     const generatedEnv = readFileSync(path.join(destination, '.env'), 'utf8');
@@ -440,16 +447,19 @@ test('generates the human-in-the-loop TypeScript template', () => {
       'utf8'
     );
     assert.match(generatedSource, /Remote View:/);
-    assert.match(generatedSource, /waitForHumanApproval/);
+    assert.match(generatedSource, /waitForHumanCompletion/);
     assert.match(generatedSource, /session_preserved_during_handoff/);
     assert.match(generatedSource, /session\.close/);
+    assert.match(generatedSource, /complete the login/);
+    assert.doesNotMatch(generatedSource, /page\.setContent/);
 
-    const generatedPage = readFileSync(
+    const generatedHandoff = readFileSync(
       path.join(destination, 'src', 'handoff.ts'),
       'utf8'
     );
-    assert.match(generatedPage, /批准并继续/);
-    assert.match(generatedPage, /body\[data-handoff-state="approved"\]/);
+    assert.match(generatedHandoff, /https:\/\/gitee\.com\/login/);
+    assert.match(generatedHandoff, /https:\/\/gitee\.com\/dashboard\/projects/);
+    assert.match(generatedHandoff, /must not contain credentials/);
 
     const generatedEnv = readFileSync(path.join(destination, '.env'), 'utf8');
     assert.match(generatedEnv, /^LEXMOUNT_PROJECT_ID=project_test$/m);
@@ -612,7 +622,7 @@ test('installs and immediately runs the generated screenshot example', () => {
       readFileSync(logPath, 'utf8').trim().split(/\r?\n/),
       [
         'install',
-        'run screenshot -- --url https://example.com',
+        'run screenshot -- --url https://semi.design/zh-CN/basic/button',
       ]
     );
     assert.match(result.stdout, /Running screenshot example/);
@@ -638,7 +648,7 @@ test('installs and immediately runs the generated WebFetch example', () => {
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(readFileSync(logPath, 'utf8').trim().split(/\r?\n/), [
       'install',
-      'run extract -- --url https://example.com',
+      'run extract -- --url https://cn.vuejs.org/guide/introduction',
     ]);
     assert.match(result.stdout, /Running WebFetch extraction example/);
     assert.doesNotMatch(result.stderr, /DEP0190/);
@@ -664,7 +674,7 @@ test('installs and immediately runs the generated search results example', () =>
     assert.equal(commands[0], 'install');
     assert.match(
       commands[1],
-      /^run search -- --query "?Lexmount browser"? --limit 3$/
+      /^run search -- --query "?Playwright 浏览器自动化"? --limit 3$/
     );
     assert.match(result.stdout, /Running search results extraction example/);
     assert.doesNotMatch(result.stderr, /DEP0190/);
@@ -712,7 +722,7 @@ test('installs and immediately runs the generated persistent login state example
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(readFileSync(logPath, 'utf8').trim().split(/\r?\n/), [
       'install',
-      'run demo -- --url https://example.com',
+      'run demo -- --url https://tdesign.tencent.com/starter/vue-next/login',
     ]);
     assert.match(result.stdout, /Running persistent login state example/);
     assert.doesNotMatch(result.stderr, /DEP0190/);
@@ -743,7 +753,7 @@ test('installs and immediately runs the generated parallel browser sessions exam
   });
 });
 
-test('installs and immediately runs the generated human handoff example', () => {
+test('installs but leaves the generated human handoff for an explicit manual run', () => {
   withTemporaryDirectory((cwd) => {
     const { binDirectory, logPath } = createFakeNpm(cwd);
 
@@ -760,9 +770,10 @@ test('installs and immediately runs the generated human handoff example', () => 
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(readFileSync(logPath, 'utf8').trim().split(/\r?\n/), [
       'install',
-      'run handoff --',
     ]);
-    assert.match(result.stdout, /Running human handoff example/);
+    assert.match(result.stdout, /human handoff example was not run automatically/);
+    assert.match(result.stdout, /npm run handoff/);
+    assert.doesNotMatch(result.stdout, /Running human handoff example/);
     assert.doesNotMatch(result.stderr, /DEP0190/);
   });
 });
@@ -784,7 +795,7 @@ test('installs and immediately runs the generated file download example', () => 
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(readFileSync(logPath, 'utf8').trim().split(/\r?\n/), [
       'install',
-      'run download -- --demo',
+      'run download -- --url https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/v24.1.0/ --locator a[href="node-v24.1.0-headers.tar.xz"]',
     ]);
     assert.match(result.stdout, /Running remote file download example/);
     assert.doesNotMatch(result.stderr, /DEP0190/);

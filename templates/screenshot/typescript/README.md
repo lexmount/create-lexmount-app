@@ -26,8 +26,12 @@ API catalog.
 ## Capture a screenshot
 
 ```bash
-npm run screenshot -- --url https://example.com
+npm run screenshot -- --url https://semi.design/zh-CN/basic/button
 ```
+
+The default real-world example captures Semi Design's public Button component
+documentation so the resulting full-page PNG contains a useful, visually rich
+developer page instead of a placeholder document.
 
 You may instead set `TARGET_URL` in `.env` and run `npm run screenshot` without
 flags.

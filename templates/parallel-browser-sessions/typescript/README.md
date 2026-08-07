@@ -21,15 +21,20 @@ Copy-Item .env.example .env
 Configure `LEXMOUNT_API_KEY` and `LEXMOUNT_PROJECT_ID` in `.env`. Leave
 `LEXMOUNT_REGION` unset unless you need a specific catalog region.
 
-## Run the default official-site batch
+## Run the default cloud-status batch
 
 ```powershell
 npm run browse
 ```
 
-`inputs/urls.json` contains three public Lexmount pages. The default
-`CONCURRENCY` is 3, so the example creates up to three Sessions at once without
-sending batch traffic to third-party sites.
+`inputs/urls.json` contains the public service-health dashboards for Alibaba
+Cloud, Tencent Cloud, and Baidu AI Cloud. The default `CONCURRENCY` is 3, so the
+example creates three isolated Sessions and checks their reachability, page
+metadata, and loading time in parallel.
+
+This template does not interpret provider-specific incident data. It reports
+whether each public dashboard loaded successfully, along with its HTTP status,
+title, first H1, and elapsed time.
 
 Progress is printed to stderr as each Session is created, completes, and
 closes. The final JSON is printed to stdout and saved to

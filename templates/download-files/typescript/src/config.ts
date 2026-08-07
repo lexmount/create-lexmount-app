@@ -1,6 +1,10 @@
 import path from 'node:path';
 
-export const DEFAULT_DOWNLOAD_LOCATOR = '#download-csv';
+export const DEFAULT_TARGET_URL =
+  'https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/v24.1.0/';
+export const DEFAULT_DOWNLOAD_LOCATOR =
+  'a[href="node-v24.1.0-headers.tar.xz"]';
+export const CONTROLLED_DEMO_LOCATOR = '#download-csv';
 export const DEFAULT_DOWNLOAD_TIMEOUT_MS = 60_000;
 export const DEFAULT_DOWNLOAD_POLL_INTERVAL_MS = 1_000;
 
@@ -27,11 +31,13 @@ export function resolveDownloadSettings(
 ): DownloadSettings {
   const targetUrl = raw.controlledDemo
     ? null
-    : optionalHttpUrl(raw.targetUrl, 'TARGET_URL / --url');
-  const downloadLocator = optionalNonEmpty(
-    raw.downloadLocator,
-    'DOWNLOAD_LOCATOR / --locator'
-  ) ?? DEFAULT_DOWNLOAD_LOCATOR;
+    : optionalHttpUrl(raw.targetUrl, 'TARGET_URL / --url') ?? DEFAULT_TARGET_URL;
+  const downloadLocator = raw.controlledDemo
+    ? CONTROLLED_DEMO_LOCATOR
+    : optionalNonEmpty(
+        raw.downloadLocator,
+        'DOWNLOAD_LOCATOR / --locator'
+      ) ?? DEFAULT_DOWNLOAD_LOCATOR;
   const outputDir = path.resolve(
     cwd,
     optionalNonEmpty(raw.outputDir, 'OUTPUT_DIR / --output') ??
