@@ -19,8 +19,10 @@ import { fileURLToPath } from 'node:url';
 import {
   authorizeWithBrowser,
   discoverCredentials,
+  isOfficialCloudApiBaseUrl,
   openExternalUrl,
   parseEnvFile,
+  resolveCloudEnvironment,
   resolveConnectBaseUrl,
 } from '../bin/auth.js';
 
@@ -806,6 +808,8 @@ test('prints help and version without requiring template flags', () => {
   const help = runCli(repositoryRoot, ['--help']);
   assert.equal(help.status, 0, help.stderr);
   assert.match(help.stdout, /--template <name>/);
+  assert.match(help.stdout, /--cloud <cloud>/);
+  assert.match(help.stdout, /supported: cn, global/);
   assert.match(help.stdout, /webpage-to-json/);
   assert.match(help.stdout, /search-results-to-json/);
   assert.match(help.stdout, /web-check/);
@@ -817,6 +821,179 @@ test('prints help and version without requiring template flags', () => {
   const version = runCli(repositoryRoot, ['--version']);
   assert.equal(version.status, 0, version.stderr);
   assert.equal(version.stdout.trim(), packageVersion);
+});
+
+test('--cloud selects the matching API environment for generated projects', () => {
+  withTemporaryDirectory((cwd) => {
+    const credentialsWithoutBaseUrl = {
+      LEXMOUNT_API_KEY: 'sk_test_not_a_real_secret',
+      LEXMOUNT_PROJECT_ID: 'project_test',
+      XDG_CONFIG_HOME: path.join(cwd, 'empty-config'),
+    };
+    const globalResult = runCli(
+      cwd,
+      [
+        'global-project',
+        '--template',
+        'screenshot',
+        '--language',
+        'typescript',
+        '--cloud',
+        'global',
+        '--no-install',
+      ],
+      credentialsWithoutBaseUrl
+    );
+    const cnResult = runCli(
+      cwd,
+      [
+        'cn-project',
+        '--template',
+        'screenshot',
+        '--language',
+        'typescript',
+        '--cloud=cn',
+        '--no-install',
+      ],
+      credentialsWithoutBaseUrl
+    );
+
+    assert.equal(globalResult.status, 0, globalResult.stderr);
+    assert.equal(cnResult.status, 0, cnResult.stderr);
+    assert.match(
+      readFileSync(path.join(cwd, 'global-project', '.env'), 'utf8'),
+      /^LEXMOUNT_BASE_URL=https:\/\/api\.lexmount\.com$/m
+    );
+    assert.match(
+      readFileSync(path.join(cwd, 'cn-project', '.env'), 'utf8'),
+      /^LEXMOUNT_BASE_URL=https:\/\/api\.lexmount\.cn$/m
+    );
+  });
+});
+
+test('--cloud rejects unsupported values and conflicting legacy configuration', () => {
+  withTemporaryDirectory((cwd) => {
+    const unsupported = runCli(cwd, [
+      '--template',
+      'screenshot',
+      '--language',
+      'typescript',
+      '--cloud',
+      'eu',
+      '--no-install',
+    ]);
+    assert.equal(unsupported.status, 1);
+    assert.match(
+      unsupported.stderr,
+      /Unsupported cloud: eu\. Supported clouds: cn, global/
+    );
+
+    const inheritedProperty = runCli(cwd, [
+      '--template',
+      'screenshot',
+      '--language',
+      'typescript',
+      '--cloud',
+      'toString',
+      '--no-install',
+    ]);
+    assert.equal(inheritedProperty.status, 1);
+    assert.match(
+      inheritedProperty.stderr,
+      /Unsupported cloud: toString\. Supported clouds: cn, global/
+    );
+
+    const conflicting = runCli(
+      cwd,
+      [
+        '--template',
+        'screenshot',
+        '--language',
+        'typescript',
+        '--cloud',
+        'global',
+        '--no-install',
+      ],
+      testCredentials(cwd)
+    );
+    assert.equal(conflicting.status, 1);
+    assert.match(
+      conflicting.stderr,
+      /selected cloud uses https:\/\/api\.lexmount\.com/
+    );
+    assert.match(
+      conflicting.stderr,
+      /LEXMOUNT_BASE_URL is configured as https:\/\/api\.lexmount\.cn/
+    );
+  });
+});
+
+test('--cloud cannot be combined with a custom authorization console', () => {
+  withTemporaryDirectory((cwd) => {
+    const result = runCli(cwd, [
+      '--template',
+      'screenshot',
+      '--language',
+      'typescript',
+      '--cloud',
+      'cn',
+      '--connect-base-url',
+      'https://example.com',
+      '--no-install',
+    ]);
+
+    assert.equal(result.status, 1);
+    assert.match(
+      result.stderr,
+      /--cloud cannot be combined with --connect-base-url/
+    );
+  });
+});
+
+test('legacy base URL selection remains compatible and prints a migration warning', () => {
+  withTemporaryDirectory((cwd) => {
+    const result = runCli(
+      cwd,
+      [
+        '--template',
+        'screenshot',
+        '--language',
+        'typescript',
+        '--no-install',
+      ],
+      testCredentials(cwd, {
+        LEXMOUNT_BASE_URL: 'https://api.lexmount.com',
+      })
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(
+      readFileSync(path.join(cwd, 'lexmount-screenshot', '.env'), 'utf8'),
+      /^LEXMOUNT_BASE_URL=https:\/\/api\.lexmount\.com$/m
+    );
+    assert.match(result.stderr, /LEXMOUNT_BASE_URL is deprecated/);
+  });
+});
+
+test('custom legacy environments remain supported without an official-cloud warning', () => {
+  withTemporaryDirectory((cwd) => {
+    const result = runCli(
+      cwd,
+      [
+        '--template',
+        'screenshot',
+        '--language',
+        'typescript',
+        '--no-install',
+      ],
+      testCredentials(cwd, {
+        LEXMOUNT_BASE_URL: 'https://apitest.local.lexmount.net',
+      })
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /LEXMOUNT_BASE_URL is deprecated/);
+  });
 });
 
 test('parses exported and quoted dotenv credentials', () => {
@@ -918,6 +1095,23 @@ test('maps office and qcloud-hk API hosts to their authorization consoles', () =
   assert.equal(
     resolveConnectBaseUrl('https://api.lexmount.cn'),
     'https://browser.lexmount.cn'
+  );
+});
+
+test('maps supported cloud names to fixed API and authorization origins', () => {
+  assert.deepEqual(resolveCloudEnvironment('cn'), {
+    apiBaseUrl: 'https://api.lexmount.cn',
+    connectBaseUrl: 'https://browser.lexmount.cn',
+  });
+  assert.deepEqual(resolveCloudEnvironment('global'), {
+    apiBaseUrl: 'https://api.lexmount.com',
+    connectBaseUrl: 'https://browser.lexmount.com',
+  });
+  assert.equal(isOfficialCloudApiBaseUrl('https://api.lexmount.cn'), true);
+  assert.equal(isOfficialCloudApiBaseUrl('https://api.lexmount.com/'), true);
+  assert.equal(
+    isOfficialCloudApiBaseUrl('https://apitest.local.lexmount.net'),
+    false
   );
 });
 

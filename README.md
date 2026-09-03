@@ -6,8 +6,15 @@ catalog.
 ## Quick start
 
 ```bash
-npx create-lexmount-app --template screenshot --language typescript
+# Lexmount China Cloud
+npx create-lexmount-app --template screenshot --language typescript --cloud cn
+
+# Lexmount Global Cloud
+npx create-lexmount-app --template screenshot --language typescript --cloud global
 ```
+
+The remaining examples use `--cloud cn`; replace it with `--cloud global` when
+working with Lexmount Global Cloud.
 
 The command creates `lexmount-screenshot/`, configures local Lexmount
 credentials, installs dependencies, and immediately runs the generated
@@ -28,7 +35,8 @@ as the first positional argument:
 ```bash
 npx create-lexmount-app my-screenshot \
   --template screenshot \
-  --language typescript
+  --language typescript \
+  --cloud cn
 ```
 
 To run it again with another URL:
@@ -52,7 +60,7 @@ For structured content without browser interaction, generate the WebFetch
 template instead:
 
 ```bash
-npx create-lexmount-app --template webpage-to-json --language typescript
+npx create-lexmount-app --template webpage-to-json --language typescript --cloud cn
 ```
 
 This creates `lexmount-webpage-to-json/`, sends one WebFetch request for Vue's
@@ -64,7 +72,7 @@ For a page that must be searched interactively, generate the browser search
 template:
 
 ```bash
-npx create-lexmount-app --template search-results-to-json --language typescript
+npx create-lexmount-app --template search-results-to-json --language typescript --cloud cn
 ```
 
 This creates `lexmount-search-results-to-json/`, opens Baidu in a temporary
@@ -78,7 +86,7 @@ For a repeatable browser check with a replayable Recording, generate the web
 check template:
 
 ```bash
-npx create-lexmount-app --template web-check --language typescript
+npx create-lexmount-app --template web-check --language typescript --cloud cn
 ```
 
 This creates `lexmount-web-check/`, verifies Lexmount's production homepage,
@@ -90,7 +98,7 @@ To prove that login state can survive across separate browser Sessions,
 generate the persistent Context template:
 
 ```bash
-npx create-lexmount-app --template persistent-login-state --language typescript
+npx create-lexmount-app --template persistent-login-state --language typescript --cloud cn
 ```
 
 This creates `lexmount-persistent-login-state/`, signs in to the public TDesign
@@ -102,7 +110,7 @@ To process several public pages at the same time without sharing browser state,
 generate the parallel Sessions template:
 
 ```bash
-npx create-lexmount-app --template parallel-browser-sessions --language typescript
+npx create-lexmount-app --template parallel-browser-sessions --language typescript --cloud cn
 ```
 
 This creates `lexmount-parallel-browser-sessions/`, checks the Alibaba Cloud,
@@ -114,7 +122,7 @@ For a workflow that must pause until a person approves it, generate the human
 handoff template:
 
 ```bash
-npx create-lexmount-app --template human-in-the-loop --language typescript
+npx create-lexmount-app --template human-in-the-loop --language typescript --cloud cn
 ```
 
 This creates `lexmount-human-in-the-loop/` and prints the manual command instead
@@ -127,7 +135,7 @@ To retrieve files created inside a remote browser Session, generate the
 downloads template:
 
 ```bash
-npx create-lexmount-app --template download-files --language typescript
+npx create-lexmount-app --template download-files --language typescript --cloud cn
 ```
 
 This creates `lexmount-download-files/`, downloads a small Node.js headers
@@ -159,6 +167,7 @@ cannot delay dependency installation.
 ```text
 create-lexmount-app [directory] --template <name> --language <language>
 
+--cloud <cloud>  Select the Lexmount cloud: cn or global
 --no-install   Generate files without installing dependencies or running the example
 --no-auth      Skip credential discovery and browser authorization
 --connect-base-url <url>
@@ -170,16 +179,27 @@ create-lexmount-app [directory] --template <name> --language <language>
 The destination defaults to `lexmount-<template>`. The CLI refuses to write
 into a non-empty directory and never overwrites an existing project.
 
-The API environment can be selected before running `npx`:
+`--cloud` selects both the API and authorization console through a fixed
+official mapping:
+
+| Cloud | API | Authorization console |
+| --- | --- | --- |
+| `cn` | `https://api.lexmount.cn` | `https://browser.lexmount.cn` |
+| `global` | `https://api.lexmount.com` | `https://browser.lexmount.com` |
+
+The previous environment-variable form remains temporarily available for
+compatibility:
 
 ```bash
 export LEXMOUNT_BASE_URL=https://apitest.local.lexmount.net # office
 export LEXMOUNT_BASE_URL=https://api.lexmount.com           # qcloud-hk
 ```
 
-The authorization console is inferred from the API URL. Use
-`--connect-base-url` only for a custom environment. For offline generation or
-CI packaging, pass `--no-auth`, then copy `.env.example` to `.env` yourself.
+It is deprecated for official CN and Global selection; use `--cloud` in new
+commands. The authorization console is inferred from the API URL only for this
+legacy or a custom environment. `--cloud` cannot be combined with
+`--connect-base-url`. For offline generation or CI packaging, pass `--no-auth`,
+then copy `.env.example` to `.env` yourself.
 
 ## Development
 
