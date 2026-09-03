@@ -14,6 +14,8 @@ import { fileURLToPath } from 'node:url';
 import {
   authorizeWithBrowser,
   discoverCredentials,
+  isOfficialCloudApiBaseUrl,
+  resolveCloudEnvironment,
   resolveConnectBaseUrl,
   writeProjectEnv,
 } from './auth.js';
@@ -223,6 +225,7 @@ Usage:
 Options:
   --template <name>       Template to generate (supported: ${supportedTemplateNames})
   --language <language>   Template language (supported: ${supportedLanguages})
+  --cloud <cloud>         Lexmount cloud to use (supported: cn, global)
   --no-install            Generate files without installing dependencies or running the example
   --no-auth               Skip local credential discovery and browser authorization
   --connect-base-url      Override the Lexmount console used for authorization
@@ -230,15 +233,16 @@ Options:
   --version, -v           Show the package version
 
 Examples:
-  npx create-lexmount-app --template screenshot --language typescript
-  npx create-lexmount-app my-screenshot --template screenshot --language typescript
-  npx create-lexmount-app --template webpage-to-json --language typescript
-  npx create-lexmount-app --template search-results-to-json --language typescript
-  npx create-lexmount-app --template web-check --language typescript
-  npx create-lexmount-app --template persistent-login-state --language typescript
-  npx create-lexmount-app --template parallel-browser-sessions --language typescript
-  npx create-lexmount-app --template human-in-the-loop --language typescript
-  npx create-lexmount-app --template download-files --language typescript
+  npx create-lexmount-app --template screenshot --language typescript --cloud cn
+  npx create-lexmount-app --template screenshot --language typescript --cloud global
+  npx create-lexmount-app my-screenshot --template screenshot --language typescript --cloud cn
+  npx create-lexmount-app --template webpage-to-json --language typescript --cloud cn
+  npx create-lexmount-app --template search-results-to-json --language typescript --cloud cn
+  npx create-lexmount-app --template web-check --language typescript --cloud cn
+  npx create-lexmount-app --template persistent-login-state --language typescript --cloud cn
+  npx create-lexmount-app --template parallel-browser-sessions --language typescript --cloud cn
+  npx create-lexmount-app --template human-in-the-loop --language typescript --cloud cn
+  npx create-lexmount-app --template download-files --language typescript --cloud cn
 `;
 
 function readOptionValue(argv, index, optionName) {
@@ -253,6 +257,7 @@ function parseArguments(argv) {
   const options = {
     directory: undefined,
     auth: true,
+    cloud: undefined,
     connectBaseUrl: undefined,
     install: true,
     language: undefined,
@@ -279,6 +284,15 @@ function parseArguments(argv) {
     }
     if (argument === '--no-auth') {
       options.auth = false;
+      continue;
+    }
+    if (argument === '--cloud') {
+      options.cloud = readOptionValue(argv, index, '--cloud');
+      index += 1;
+      continue;
+    }
+    if (argument.startsWith('--cloud=')) {
+      options.cloud = argument.slice('--cloud='.length);
       continue;
     }
     if (argument === '--connect-base-url') {
@@ -508,6 +522,12 @@ async function main(argv) {
   }
 
   const selection = validateSelection(options.template, options.language);
+  const cloudEnvironment = options.cloud
+    ? resolveCloudEnvironment(options.cloud)
+    : undefined;
+  if (cloudEnvironment && options.connectBaseUrl) {
+    throw new Error('--cloud cannot be combined with --connect-base-url');
+  }
 
   const directory = options.directory ?? `lexmount-${options.template}`;
   const destination = path.resolve(process.cwd(), directory);
@@ -515,8 +535,18 @@ async function main(argv) {
 
   let credentials;
   if (options.auth) {
+    if (
+      !options.cloud &&
+      (isOfficialCloudApiBaseUrl(process.env.LEXMOUNT_BASE_URL) ||
+        isOfficialCloudApiBaseUrl(process.env.LEXMOUNT_WEBFETCH_BASE_URL))
+    ) {
+      console.warn(
+        'Warning: selecting a cloud with LEXMOUNT_BASE_URL is deprecated. Use --cloud cn or --cloud global instead.'
+      );
+    }
     const discovered = discoverCredentials({
       preferredCli: selection.templateDefinition.credentialSource,
+      requestedApiBaseUrl: cloudEnvironment?.apiBaseUrl,
     });
     credentials = discovered.credentials;
     if (credentials) {
@@ -526,10 +556,9 @@ async function main(argv) {
       };
       console.log(`Using Lexmount credentials from ${credentials.source}.`);
     } else {
-      const connectBaseUrl = resolveConnectBaseUrl(
-        discovered.apiBaseUrl,
-        options.connectBaseUrl
-      );
+      const connectBaseUrl =
+        cloudEnvironment?.connectBaseUrl ||
+        resolveConnectBaseUrl(discovered.apiBaseUrl, options.connectBaseUrl);
       console.log(
         `No complete local Lexmount credentials found. Opening ${connectBaseUrl} for authorization...`
       );

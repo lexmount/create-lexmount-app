@@ -12,6 +12,17 @@ import { spawn } from 'node:child_process';
 
 export const DEFAULT_API_BASE_URL = 'https://api.lexmount.cn';
 
+const CLOUD_ENVIRONMENTS = {
+  cn: {
+    apiBaseUrl: 'https://api.lexmount.cn',
+    connectBaseUrl: 'https://browser.lexmount.cn',
+  },
+  global: {
+    apiBaseUrl: 'https://api.lexmount.com',
+    connectBaseUrl: 'https://browser.lexmount.com',
+  },
+};
+
 const CONNECT_SCOPE = ['browser:sessions', 'browser:actions'];
 const AUTH_TIMEOUT_MS = 5 * 60 * 1000;
 const EXCHANGE_TIMEOUT_MS = 30 * 1000;
@@ -171,18 +182,51 @@ function sameBaseUrl(left, right) {
   );
 }
 
+export function resolveCloudEnvironment(cloud) {
+  if (!Object.hasOwn(CLOUD_ENVIRONMENTS, cloud)) {
+    throw new Error(`Unsupported cloud: ${cloud}. Supported clouds: cn, global`);
+  }
+  const environment = CLOUD_ENVIRONMENTS[cloud];
+  return { ...environment };
+}
+
+export function isOfficialCloudApiBaseUrl(value) {
+  if (!oneLine(value)) return false;
+  return Object.values(CLOUD_ENVIRONMENTS).some((environment) =>
+    sameBaseUrl(value, environment.apiBaseUrl)
+  );
+}
+
 export function discoverCredentials({
   cwd = process.cwd(),
   env = process.env,
   homeDirectory = os.homedir(),
   preferredCli = 'browser-cli',
+  requestedApiBaseUrl,
 } = {}) {
   const localEnv = readLocalEnv(cwd);
-  const explicitApiBaseUrl =
+  const configuredApiBaseUrl =
     oneLine(env.LEXMOUNT_BASE_URL) ||
     oneLine(env.LEXMOUNT_WEBFETCH_BASE_URL) ||
     oneLine(localEnv?.values.LEXMOUNT_BASE_URL) ||
     oneLine(localEnv?.values.LEXMOUNT_WEBFETCH_BASE_URL);
+  const selectedApiBaseUrl = oneLine(requestedApiBaseUrl);
+  if (
+    selectedApiBaseUrl &&
+    configuredApiBaseUrl &&
+    !sameBaseUrl(selectedApiBaseUrl, configuredApiBaseUrl)
+  ) {
+    throw new Error(
+      `The selected cloud uses ${normalizeHttpUrl(
+        selectedApiBaseUrl,
+        '--cloud API base URL'
+      )}, but LEXMOUNT_BASE_URL is configured as ${normalizeHttpUrl(
+        configuredApiBaseUrl,
+        'LEXMOUNT_BASE_URL'
+      )}. Remove the old environment setting or choose the matching cloud.`
+    );
+  }
+  const explicitApiBaseUrl = selectedApiBaseUrl || configuredApiBaseUrl;
 
   const browserCliCredentials = readBrowserCliCredentials(env, homeDirectory);
   const webfetchCliCredentials = readWebfetchCliCredentials(env, homeDirectory);
