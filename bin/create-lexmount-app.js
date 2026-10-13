@@ -34,6 +34,27 @@ const DEFAULT_DOWNLOAD_URL =
 const DEFAULT_DOWNLOAD_LOCATOR = 'a[href="node-v24.1.0-headers.tar.xz"]';
 const templateDefinitions = new Map([
   [
+    'local-network-access',
+    {
+      description: 'Keep a cloud browser connected to your intranet through a local SDK tunnel.',
+      credentialSource: 'browser-cli',
+      connectIntent: 'scaffold-browser-example',
+      connectScopes: ['browser:sessions', 'browser:actions'],
+      languages: new Map([
+        [
+          'typescript',
+          {
+            run: {
+              label: 'local network access',
+              script: 'start',
+              args: [],
+            },
+          },
+        ],
+      ]),
+    },
+  ],
+  [
     'screenshot',
     {
       description: 'Navigate to a URL and capture a full-page screenshot.',
@@ -243,6 +264,7 @@ Examples:
   npx create-lexmount-app --template parallel-browser-sessions --language typescript --cloud cn
   npx create-lexmount-app --template human-in-the-loop --language typescript --cloud cn
   npx create-lexmount-app --template download-files --language typescript --cloud cn
+  npx create-lexmount-app --template local-network-access --language typescript --cloud cn
 `;
 
 function readOptionValue(argv, index, optionName) {

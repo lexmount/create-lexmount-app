@@ -91,6 +91,51 @@ function createFakeNpm(cwd) {
   return { binDirectory, logPath };
 }
 
+test('generates the local network template with automatic credential setup and no default target', () => {
+  withTemporaryDirectory((cwd) => {
+    const result = runCli(cwd, [
+      '--template', 'local-network-access', '--language', 'typescript',
+      '--cloud', 'cn', '--no-install',
+    ], testCredentials(cwd));
+    assert.equal(result.status, 0, result.stderr);
+    const destination = path.join(cwd, 'lexmount-local-network-access');
+    const metadata = JSON.parse(readFileSync(path.join(destination, 'package.json'), 'utf8'));
+    assert.equal(metadata.name, 'lexmount-local-network-access');
+    assert.equal(metadata.dependencies.lexmount, '^0.6.1');
+    assert.equal(metadata.scripts.start, 'tsx src/index.ts');
+    const env = readFileSync(path.join(destination, '.env'), 'utf8');
+    assert.match(env, /^LEXMOUNT_API_KEY=sk_test_not_a_real_secret$/m);
+    assert.doesNotMatch(env, /^TARGET_URL=/m);
+    assert.doesNotMatch(result.stdout + result.stderr, /sk_test_not_a_real_secret/);
+    assert.ok(existsSync(path.join(destination, 'test', 'lifecycle.test.ts')));
+    if (process.platform !== 'win32') assert.equal(statSync(path.join(destination, '.env')).mode & 0o777, 0o600);
+  });
+});
+
+test('installs and runs local network access without supplying a public target or manual setup', () => {
+  withTemporaryDirectory((cwd) => {
+    const { binDirectory, logPath } = createFakeNpm(cwd);
+    const result = runCli(cwd, [
+      '--template', 'local-network-access', '--language', 'typescript', '--cloud', 'cn',
+    ], testCredentials(cwd, {
+      FAKE_NPM_LOG: logPath,
+      PATH: `${binDirectory}${path.delimiter}${process.env.PATH ?? ''}`,
+      npm_config_user_agent: 'npm/10.0.0 node/v22.0.0',
+    }));
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(readFileSync(logPath, 'utf8').trim().split(/\r?\n/), ['install', 'run start --']);
+    assert.doesNotMatch(result.stdout, /Add LEXMOUNT_API_KEY|not run automatically/);
+  });
+});
+
+test('local network access supports TypeScript only', () => {
+  withTemporaryDirectory((cwd) => {
+    const result = runCli(cwd, ['--template', 'local-network-access', '--language', 'python', '--no-auth']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Supported languages: typescript/);
+  });
+});
+
 test('generates the screenshot TypeScript template and a protected local env', () => {
   withTemporaryDirectory((cwd) => {
     const result = runCli(cwd, [
@@ -563,7 +608,7 @@ test('rejects an unknown template name', () => {
     assert.match(result.stderr, /Unsupported template: unknown-template/);
     assert.match(
       result.stderr,
-      /Supported templates: screenshot, webpage-to-json, search-results-to-json, web-check, persistent-login-state, parallel-browser-sessions, human-in-the-loop, download-files/
+      /Supported templates: local-network-access, screenshot, webpage-to-json, search-results-to-json, web-check, persistent-login-state, parallel-browser-sessions, human-in-the-loop, download-files/
     );
   });
 });

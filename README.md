@@ -151,8 +151,23 @@ cannot delay dependency installation.
 
 ## Supported templates
 
+To open a company intranet or VPN website through your own computer's network:
+
+```bash
+npx create-lexmount-app --template local-network-access --language typescript --cloud cn
+```
+
+The launcher handles authorization and dependency installation, then prompts for
+the target URL. The SDK maintains a local tunnel while you use the cloud browser
+from the console. Keep the terminal and VPN running; stop the session in the
+console when finished. The script then closes its tunnel and exits. Interrupting
+the local script does **not** stop the cloud session or its billing. No Inspect
+URL, screenshot or page report is printed. Localhost/loopback targets are not
+supported. See the [template guide](templates/local-network-access/typescript/README.md).
+
 | Template | Language | Description |
 | --- | --- | --- |
+| `local-network-access` | `typescript` | Keep a cloud browser connected to a company intranet/VPN through a local SDK tunnel; stop it from the console. |
 | `screenshot` | `typescript` | Navigate to a URL and capture a full-page screenshot. |
 | `webpage-to-json` | `typescript` | Extract structured JSON from a public webpage with WebFetch. |
 | `search-results-to-json` | `typescript` | Search a page and save the first N results as structured JSON. |
