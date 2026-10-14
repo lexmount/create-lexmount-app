@@ -515,6 +515,33 @@ test('generates the human-in-the-loop TypeScript template', () => {
   });
 });
 
+for (const cloud of ['cn', 'global']) {
+  test(`generates the website auto-captcha template for ${cloud} with a manual run command`, () => {
+    withTemporaryDirectory((cwd) => {
+      const apiBaseUrl = cloud === 'cn' ? 'https://api.lexmount.cn' : 'https://api.lexmount.com';
+      const result = runCli(
+        cwd,
+        ['--template', 'auto-captcha', '--language', 'typescript', '--cloud', cloud, '--no-install'],
+        testCredentials(cwd, { LEXMOUNT_BASE_URL: apiBaseUrl })
+      );
+      assert.equal(result.status, 0, result.stderr);
+      const destination = path.join(cwd, 'lexmount-auto-captcha');
+      const metadata = JSON.parse(readFileSync(path.join(destination, 'package.json'), 'utf8'));
+      assert.equal(metadata.name, 'lexmount-auto-captcha');
+      assert.equal(metadata.scripts.start, 'tsx src/index.ts');
+      assert.equal(metadata.dependencies.lexmount, '^0.6.1');
+      const generatedEnv = parseEnvFile(readFileSync(path.join(destination, '.env'), 'utf8'));
+      assert.equal(generatedEnv.LEXMOUNT_BASE_URL, apiBaseUrl);
+      assert.equal(generatedEnv.LEXMOUNT_PROJECT_ID, 'project_test');
+      assert.match(readFileSync(path.join(destination, '.gitignore'), 'utf8'), /^artifacts\/$/m);
+      assert.match(result.stdout, /CAPTCHA allowance/);
+      assert.match(result.stdout, /npm run start|npm start/);
+      assert.doesNotMatch(result.stdout, /sk_test_not_a_real_secret/);
+      assert.equal(existsSync(path.join(destination, 'src', 'index.ts')), true);
+    });
+  });
+}
+
 test('generates the download-files TypeScript template', () => {
   withTemporaryDirectory((cwd) => {
     const result = runCli(
@@ -846,6 +873,27 @@ test('installs and immediately runs the generated file download example', () => 
     ]);
     assert.match(result.stdout, /Running remote file download example/);
     assert.doesNotMatch(result.stderr, /DEP0190/);
+  });
+});
+
+test('does not start CAPTCHA sessions automatically after credential setup and installation', () => {
+  withTemporaryDirectory((cwd) => {
+    const { binDirectory, logPath } = createFakeNpm(cwd);
+    const result = runCli(
+      cwd,
+      ['--template', 'auto-captcha', '--language', 'typescript'],
+      testCredentials(cwd, {
+        FAKE_NPM_LOG: logPath,
+        PATH: `${binDirectory}${path.delimiter}${process.env.PATH ?? ''}`,
+        npm_config_user_agent: 'npm/10.0.0 node/v22.0.0',
+      })
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(readFileSync(logPath, 'utf8').trim().split(/\r?\n/), ['install']);
+    assert.match(result.stdout, /CAPTCHA allowance/);
+    assert.match(result.stdout, /was not run automatically/);
+    assert.match(result.stdout, /npm run start/);
+    assert.doesNotMatch(result.stdout, /sk_test_not_a_real_secret/);
   });
 });
 

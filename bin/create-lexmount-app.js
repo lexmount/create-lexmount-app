@@ -228,6 +228,28 @@ const templateDefinitions = new Map([
       ]),
     },
   ],
+  [
+    'auto-captcha',
+    {
+      description: 'Complete a CAPTCHA-protected demo form in one browser Session. Requires CAPTCHA allowance.',
+      credentialSource: 'browser-cli',
+      connectIntent: 'scaffold-browser-example',
+      connectScopes: ['browser:sessions', 'browser:actions'],
+      languages: new Map([
+        [
+          'typescript',
+          {
+            run: {
+              label: 'automatic CAPTCHA example (requires available CAPTCHA allowance)',
+              script: 'start',
+              args: [],
+              autoRun: false,
+            },
+          },
+        ],
+      ]),
+    },
+  ],
 ]);
 const supportedTemplateNames = [...templateDefinitions.keys()].join(', ');
 const supportedLanguages = [
@@ -265,6 +287,7 @@ Examples:
   npx create-lexmount-app --template human-in-the-loop --language typescript --cloud cn
   npx create-lexmount-app --template download-files --language typescript --cloud cn
   npx create-lexmount-app --template local-network-access --language typescript --cloud cn
+  npx create-lexmount-app --template auto-captcha --language typescript --cloud cn
 `;
 
 function readOptionValue(argv, index, optionName) {
