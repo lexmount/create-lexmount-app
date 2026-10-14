@@ -12,7 +12,7 @@
 - 项目必须具备验证码自动处理权益，且仍有可用额度。Free 套餐不包含这项能力；仅传入 `enableCaptcha: true` 不会赋予套餐权益。见[国内站额度说明](https://browser.lexmount.cn/docs/pricing)或[全球站额度说明](https://browser.lexmount.com/docs/pricing#automatic-captcha-allowance)。
 - 使用与 API 所属站点匹配的凭据。脚手架的 `--cloud cn` 或 `--cloud global` 会配置对应的 API 地址及凭据。
 
-脚手架生成时会配置 `.env`，但不会自动运行此示例。手动配置时，复制 `.env.example` 为 `.env`，填写你自己项目的凭据：
+脚手架会配置 `.env`、安装依赖并自动运行示例。手动配置时，复制 `.env.example` 为 `.env`，填写你自己项目的凭据：
 
 ```dotenv
 LEXMOUNT_API_KEY=your_api_key_here
@@ -25,12 +25,20 @@ LEXMOUNT_BASE_URL=https://api.lexmount.cn
 
 ## 执行
 
+在准备存放项目的目录执行一条命令，即可完成项目生成、凭据配置、依赖安装和云端任务：
+
+```sh
+npx create-lexmount-app@latest --template auto-captcha --language typescript --cloud cn
+```
+
+使用 `--no-install` 或 `--no-auth` 跳过安装或授权时，脚手架不会自动执行云端任务，并会打印后续步骤。手动补齐配置后，在项目目录执行：
+
 ```sh
 npm install
 npm start
 ```
 
-脚手架已安装依赖时，直接执行 `npm start` 即可。默认运行 `recaptcha-net` 示例，最多等待验证码结果 180 秒。可调整等待时间：
+默认运行 `recaptcha-net` 示例，最多等待验证码结果 180 秒。需要再次运行时，在生成的项目目录执行 `npm start`。也可调整等待时间：
 
 ```sh
 npm start -- --timeout-seconds 300

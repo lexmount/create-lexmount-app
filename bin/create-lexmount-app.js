@@ -243,7 +243,6 @@ const templateDefinitions = new Map([
               label: 'automatic CAPTCHA example (requires available CAPTCHA allowance)',
               script: 'start',
               args: [],
-              autoRun: false,
             },
           },
         ],

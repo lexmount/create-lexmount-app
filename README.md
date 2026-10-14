@@ -182,12 +182,11 @@ To run the automatic CAPTCHA example:
 
 ```bash
 npx create-lexmount-app@latest --template auto-captcha --language typescript --cloud cn
-cd lexmount-auto-captcha
-npm start
 ```
 
-The example is started manually after generation so you can confirm that the
-selected project has CAPTCHA eligibility and remaining allowance. It uses
+The command configures credentials, installs dependencies, and runs the example
+automatically. The selected project needs CAPTCHA eligibility and remaining
+allowance. It uses
 Google's `recaptcha.net` demo, which was verified from China Cloud's Nanjing
 region without an official proxy. Success requires the demo server to return
 `Verification Success`; receiving a CAPTCHA response alone does not pass the
