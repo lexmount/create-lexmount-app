@@ -192,6 +192,11 @@ region without an official proxy. Success requires the demo server to return
 `Verification Success`; receiving a CAPTCHA response alone does not pass the
 task. See its [setup and validation status](templates/auto-captcha/typescript/README.md).
 
+The cloud Session and page remain available after the task or an interruption.
+The terminal prints the Session ID and console link; stop the Session in the
+console when finished. It continues to use session quota until stopped or ended
+by the service.
+
 ## CLI options
 
 ```text

@@ -1,6 +1,6 @@
 {
   "name": "create-lexmount-app",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "Scaffold runnable Lexmount Browser and WebFetch templates",
   "type": "module",
   "bin": {
