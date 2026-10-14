@@ -515,6 +515,26 @@ test('generates the human-in-the-loop TypeScript template', () => {
   });
 });
 
+test('generates the automatic-captcha template with a manual run command', () => {
+  withTemporaryDirectory((cwd) => {
+    const result = runCli(
+      cwd,
+      ['--template', 'automatic-captcha', '--language', 'typescript', '--cloud', 'global', '--no-auth', '--no-install']
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const destination = path.join(cwd, 'lexmount-automatic-captcha');
+    const metadata = JSON.parse(readFileSync(path.join(destination, 'package.json'), 'utf8'));
+    assert.equal(metadata.name, 'lexmount-automatic-captcha');
+    assert.equal(metadata.scripts.start, 'tsx src/index.ts');
+    assert.equal(metadata.dependencies.lexmount, '^0.6.1');
+    assert.match(readFileSync(path.join(destination, '.env.example'), 'utf8'), /https:\/\/api\.lexmount\.com/);
+    assert.match(readFileSync(path.join(destination, '.gitignore'), 'utf8'), /^artifacts\/$/m);
+    assert.match(result.stdout, /CAPTCHA allowance/);
+    assert.match(result.stdout, /npm run start|npm start/);
+    assert.equal(existsSync(path.join(destination, 'src', 'index.ts')), true);
+  });
+});
+
 test('generates the download-files TypeScript template', () => {
   withTemporaryDirectory((cwd) => {
     const result = runCli(
@@ -846,6 +866,27 @@ test('installs and immediately runs the generated file download example', () => 
     ]);
     assert.match(result.stdout, /Running remote file download example/);
     assert.doesNotMatch(result.stderr, /DEP0190/);
+  });
+});
+
+test('does not start CAPTCHA sessions automatically after credential setup and installation', () => {
+  withTemporaryDirectory((cwd) => {
+    const { binDirectory, logPath } = createFakeNpm(cwd);
+    const result = runCli(
+      cwd,
+      ['--template', 'automatic-captcha', '--language', 'typescript'],
+      testCredentials(cwd, {
+        FAKE_NPM_LOG: logPath,
+        PATH: `${binDirectory}${path.delimiter}${process.env.PATH ?? ''}`,
+        npm_config_user_agent: 'npm/10.0.0 node/v22.0.0',
+      })
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(readFileSync(logPath, 'utf8').trim().split(/\r?\n/), ['install']);
+    assert.match(result.stdout, /CAPTCHA allowance/);
+    assert.match(result.stdout, /was not run automatically/);
+    assert.match(result.stdout, /npm run start/);
+    assert.doesNotMatch(result.stdout, /sk_test_not_a_real_secret/);
   });
 });
 

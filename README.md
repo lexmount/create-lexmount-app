@@ -176,6 +176,11 @@ supported. See the [template guide](templates/local-network-access/typescript/RE
 | `parallel-browser-sessions` | `typescript` | Process a URL batch in isolated Sessions with bounded concurrency. |
 | `human-in-the-loop` | `typescript` | Pause for a human login and resume automation in the same Session. |
 | `download-files` | `typescript` | Download remote browser files locally with a manifest and ZIP archive. |
+| `automatic-captcha` | `typescript` | Fill a demo form, wait for automatic CAPTCHA processing, and verify submission in the same Session. Requires CAPTCHA allowance; live success verification is pending. |
+
+The automatic CAPTCHA example is started manually after generation so you can
+confirm that the selected project has CAPTCHA eligibility and remaining
+allowance. See its [setup and validation status](templates/automatic-captcha/typescript/README.md).
 
 ## CLI options
 

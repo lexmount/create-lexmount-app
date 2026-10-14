@@ -228,6 +228,28 @@ const templateDefinitions = new Map([
       ]),
     },
   ],
+  [
+    'automatic-captcha',
+    {
+      description: 'Complete a CAPTCHA-protected demo form in one browser Session. Requires CAPTCHA allowance.',
+      credentialSource: 'browser-cli',
+      connectIntent: 'scaffold-browser-example',
+      connectScopes: ['browser:sessions', 'browser:actions'],
+      languages: new Map([
+        [
+          'typescript',
+          {
+            run: {
+              label: 'automatic CAPTCHA example (requires available CAPTCHA allowance)',
+              script: 'start',
+              args: [],
+              autoRun: false,
+            },
+          },
+        ],
+      ]),
+    },
+  ],
 ]);
 const supportedTemplateNames = [...templateDefinitions.keys()].join(', ');
 const supportedLanguages = [
