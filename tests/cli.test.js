@@ -516,7 +516,7 @@ test('generates the human-in-the-loop TypeScript template', () => {
 });
 
 for (const cloud of ['cn', 'global']) {
-  test(`generates the website auto-captcha template for ${cloud} with a manual run command`, () => {
+  test(`generates the website auto-captcha template for ${cloud} with manual instructions when installation is skipped`, () => {
     withTemporaryDirectory((cwd) => {
       const apiBaseUrl = cloud === 'cn' ? 'https://api.lexmount.cn' : 'https://api.lexmount.com';
       const result = runCli(
@@ -876,7 +876,7 @@ test('installs and immediately runs the generated file download example', () => 
   });
 });
 
-test('does not start CAPTCHA sessions automatically after credential setup and installation', () => {
+test('installs and immediately runs the automatic CAPTCHA example', () => {
   withTemporaryDirectory((cwd) => {
     const { binDirectory, logPath } = createFakeNpm(cwd);
     const result = runCli(
@@ -889,10 +889,13 @@ test('does not start CAPTCHA sessions automatically after credential setup and i
       })
     );
     assert.equal(result.status, 0, result.stderr);
-    assert.deepEqual(readFileSync(logPath, 'utf8').trim().split(/\r?\n/), ['install']);
+    assert.deepEqual(readFileSync(logPath, 'utf8').trim().split(/\r?\n/), [
+      'install',
+      'run start --',
+    ]);
     assert.match(result.stdout, /CAPTCHA allowance/);
-    assert.match(result.stdout, /was not run automatically/);
-    assert.match(result.stdout, /npm run start/);
+    assert.match(result.stdout, /Running automatic CAPTCHA example/);
+    assert.doesNotMatch(result.stdout, /was not run automatically/);
     assert.doesNotMatch(result.stdout, /sk_test_not_a_real_secret/);
   });
 });
