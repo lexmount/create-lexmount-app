@@ -1,9 +1,9 @@
 LEXMOUNT_API_KEY=your_api_key_here
 LEXMOUNT_PROJECT_ID=your_project_id_here
 # Use credentials from the same cloud as this API host.
-LEXMOUNT_BASE_URL=https://api.lexmount.com
+LEXMOUNT_BASE_URL=https://api.lexmount.cn
 # Optional: a region ID from the API catalog. Otherwise selection is automatic.
-# LEXMOUNT_REGION=hk-1
+# LEXMOUNT_REGION=nanjing-1
 
 # This project must have automatic CAPTCHA processing eligibility and allowance.
 # Free plans do not include this capability. enableCaptcha alone does not grant it.

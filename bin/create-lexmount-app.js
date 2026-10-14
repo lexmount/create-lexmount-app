@@ -229,7 +229,7 @@ const templateDefinitions = new Map([
     },
   ],
   [
-    'automatic-captcha',
+    'auto-captcha',
     {
       description: 'Complete a CAPTCHA-protected demo form in one browser Session. Requires CAPTCHA allowance.',
       credentialSource: 'browser-cli',
@@ -287,6 +287,7 @@ Examples:
   npx create-lexmount-app --template human-in-the-loop --language typescript --cloud cn
   npx create-lexmount-app --template download-files --language typescript --cloud cn
   npx create-lexmount-app --template local-network-access --language typescript --cloud cn
+  npx create-lexmount-app --template auto-captcha --language typescript --cloud cn
 `;
 
 function readOptionValue(argv, index, optionName) {

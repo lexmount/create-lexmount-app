@@ -9,6 +9,10 @@ config({ path: '.env.local', override: false });
 config({ override: false });
 
 const demos = {
+  'recaptcha-net': {
+    url: 'https://www.recaptcha.net/recaptcha/api2/demo',
+    submit: '#recaptcha-demo-submit',
+  },
   form: {
     url: 'https://recaptcha-demo.appspot.com/recaptcha-v2-checkbox.php',
     submit: 'button[type="submit"]',
@@ -46,7 +50,7 @@ function safeError(error: unknown): string {
 async function main(): Promise<void> {
   const { values } = parseArgs({
     options: {
-      demo: { type: 'string', default: 'form' },
+      demo: { type: 'string', default: 'recaptcha-net' },
       'timeout-seconds': { type: 'string', default: '180' },
       'official-proxy': { type: 'boolean', default: false },
       'output-dir': { type: 'string' },
@@ -55,11 +59,12 @@ async function main(): Promise<void> {
     allowPositionals: false,
   });
   if (
+    values.demo !== 'recaptcha-net' &&
     values.demo !== 'form' &&
     values.demo !== 'google' &&
     values.demo !== 'all'
   ) {
-    throw new Error('--demo must be form, google, or all.');
+    throw new Error('--demo must be recaptcha-net, form, google, or all.');
   }
   const timeoutSeconds = Number(values['timeout-seconds']);
   if (
@@ -76,7 +81,7 @@ async function main(): Promise<void> {
   }
 
   const selected: Demo[] =
-    values.demo === 'all' ? ['form', 'google'] : [values.demo];
+    values.demo === 'all' ? ['recaptcha-net', 'form', 'google'] : [values.demo];
   const directory = path.resolve(
     values['output-dir'] ??
       path.join('artifacts', new Date().toISOString().replace(/[:.]/g, '-'))
@@ -88,7 +93,7 @@ async function main(): Promise<void> {
     logLevel: 'SILENT',
   });
   const report = {
-    template: 'automatic-captcha',
+    template: 'auto-captcha',
     started_at: new Date().toISOString(),
     api_host: new URL(client.baseUrl).host,
     enable_captcha: true,
@@ -276,7 +281,14 @@ async function runDemo(
   console.error(
     `[${demo}] Verification response received. Submitting the form.`
   );
-  await page.locator(demos[demo].submit).click();
+  // A challenge overlay can remain after automatic fill-in and intercept clicks.
+  // Native form submission keeps browser validation and the server-side CAPTCHA check.
+  await page.locator(demos[demo].submit).evaluate((element) => {
+    const submitter = element as HTMLButtonElement | HTMLInputElement;
+    if (!submitter.form)
+      throw new Error('The demo submit control has no form.');
+    submitter.form.requestSubmit(submitter);
+  });
   task.stage = 'confirm-server-acceptance';
   // A token or checked box alone is not success: require the website's response.
   const success = page.getByText(
