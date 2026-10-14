@@ -99,6 +99,7 @@ async function main(): Promise<void> {
     enable_captcha: true,
     official_proxy: values['official-proxy'],
     session_id: undefined as string | undefined,
+    console_url: undefined as string | undefined,
     status: 'failed' as 'passed' | 'failed',
     cleanup: 'no-session-returned',
     results: [] as TaskResult[],
@@ -107,11 +108,18 @@ async function main(): Promise<void> {
   let session: SessionInfo | undefined;
   let browser: Browser | undefined;
   let page: Page | undefined;
+  let disconnectPromise: Promise<void> | undefined;
+  const disconnectBrowser = (): Promise<void> => {
+    if (!browser) return Promise.resolve();
+    // connectOverCDP uses the existing context: close() only disconnects this client.
+    disconnectPromise ??= browser.close();
+    return disconnectPromise;
+  };
   let interrupted = false;
   const interrupt = () => {
     interrupted = true;
-    // Closing the page releases an active CAPTCHA wait, then finally deletes the Session.
-    void page?.close().catch(() => undefined);
+    // Cancel pending automation without closing the remote page or cloud Session.
+    void disconnectBrowser().catch(() => undefined);
   };
   process.once('SIGINT', interrupt);
   process.once('SIGTERM', interrupt);
@@ -133,11 +141,20 @@ async function main(): Promise<void> {
       pollTimeoutMs: 120_000,
     });
     report.session_id = session.id;
+    const consoleOrigins: Partial<Record<string, string>> = {
+      'api.lexmount.cn': 'https://browser.lexmount.cn',
+      'api.lexmount.com': 'https://browser.lexmount.com',
+    };
+    const consoleOrigin = consoleOrigins[report.api_host];
+    if (consoleOrigin) {
+      report.console_url = `${consoleOrigin}/settings/sessions`;
+    }
     console.error(`Session created: ${session.id}`);
     if (interrupted) throw new Error('Run interrupted.');
     browser = await chromium.connectOverCDP(session.connectUrl, {
       timeout: 30_000,
     });
+    if (interrupted) throw new Error('Run interrupted.');
     const context = browser.contexts()[0];
     if (!context)
       throw new Error('The Session did not expose a browser context.');
@@ -173,22 +190,16 @@ async function main(): Promise<void> {
   } catch (error) {
     report.errors.push(interrupted ? 'Run interrupted.' : safeError(error));
   } finally {
-    await browser
-      ?.close()
-      .catch((error) =>
-        report.errors.push(`CDP disconnect: ${safeError(error)}`)
-      );
+    await disconnectBrowser().catch((error) =>
+      report.errors.push(`CDP disconnect: ${safeError(error)}`)
+    );
     if (session) {
-      try {
-        // Use delete directly: Session.close() suppresses server errors in SDK 0.6.1.
-        await client.sessions.delete({ sessionId: session.id });
-        report.cleanup = 'session-deleted';
-      } catch (error) {
-        report.cleanup = 'delete-failed';
-        report.errors.push(
-          `Session cleanup failed: ${safeError(error)}. Stop the Session in the console.`
-        );
-      }
+      report.cleanup = 'session-kept';
+      console.error(`Session kept for inspection: ${session.id}`);
+      if (report.console_url) console.error(`Console: ${report.console_url}`);
+      console.error(
+        'Stop this Session in the Lexmount console when finished. It continues to use session quota until stopped or ended by the service.'
+      );
     }
     client.close();
     process.removeListener('SIGINT', interrupt);
